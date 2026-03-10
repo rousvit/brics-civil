@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>BricsLayerPlugin</RootNamespace>
+    <AssemblyName>BricsLayerPlugin</AssemblyName>
+    <OutputType>Library</OutputType>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Set BricsCAD install path; override via environment or Directory.Build.props -->
+    <BricsCADPath Condition="'$(BricsCADPath)' == ''">C:\Program Files\Bricsys\BricsCAD V25</BricsCADPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- BricsCAD .NET API references -->
+    <Reference Include="BrxMgd">
+      <HintPath>$(BricsCADPath)\BrxMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="TD_Mgd">
+      <HintPath>$(BricsCADPath)\TD_Mgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="TD_MgdBrep">
+      <HintPath>$(BricsCADPath)\TD_MgdBrep.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
