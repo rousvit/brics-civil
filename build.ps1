@@ -158,17 +158,30 @@ if ($BricsCADPath) {
     }
 }
 
-# DULEZITE: Nepouzivame splatting (@args) s /p: vlastnostmi,
-# protoze PowerShell spatne predava cesty s mezerami.
-# Misto toho voláme dotnet primo s jednotlivymi argumenty.
-Write-Host ""
+# RESENI: Predavani cest s mezerami pres /p: je v PowerShell nespolehlivy.
+# Zapiseme cestu do Directory.Build.props – MSBuild ho nacte automaticky.
 if ($BricsCADPath) {
-    Write-Host "       dotnet build ... /p:BricsCADPath=$BricsCADPath" -ForegroundColor DarkGray
-    & dotnet build $csprojPath -c $Configuration --nologo "/p:BricsCADPath=$BricsCADPath"
-} else {
-    & dotnet build $csprojPath -c $Configuration --nologo
+    $propsFile = Join-Path $ScriptDir "Directory.Build.props"
+    $propsContent = @"
+<Project>
+  <PropertyGroup>
+    <BricsCADPath>$BricsCADPath</BricsCADPath>
+  </PropertyGroup>
+</Project>
+"@
+    Set-Content -Path $propsFile -Value $propsContent -Encoding UTF8
+    Write-Host "       Directory.Build.props: vytvoren s cestou" -ForegroundColor Gray
 }
+
+Write-Host ""
+& dotnet build $csprojPath -c $Configuration --nologo
 $buildResult = $LASTEXITCODE
+
+# Smazat docasny Directory.Build.props
+$propsFile = Join-Path $ScriptDir "Directory.Build.props"
+if (Test-Path $propsFile) {
+    Remove-Item $propsFile -Force -ErrorAction SilentlyContinue
+}
 
 if ($buildResult -ne 0) {
     Write-Host ""
