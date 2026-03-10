@@ -177,13 +177,15 @@ begin
 
   // Upozornit na .NET
   if not IsDotNet8Installed then
-    MsgBox('Na tomto počítači nebyl nalezen .NET 8.0 Desktop Runtime.' + #13#10 +
-           #13#10 +
-           'Instalátor se pokusí jej nainstalovat automaticky.' + #13#10 +
-           'Pokud nemáte offline balíček, stáhněte jej z:' + #13#10 +
-           'https://dotnet.microsoft.com/download/dotnet/8.0' + #13#10 +
-           #13#10 +
-           'Pokud je .NET 8.0 již nainstalovaný, ignorujte tuto zprávu.',
+    MsgBox('Na tomto pocitaci nebyl nalezen .NET 8.0 Desktop Runtime.'
+           + Chr(13) + Chr(10) + Chr(13) + Chr(10)
+           + 'Instalator se pokusi jej nainstalovat automaticky.'
+           + Chr(13) + Chr(10)
+           + 'Pokud nemate offline balicek, stahnete jej z:'
+           + Chr(13) + Chr(10)
+           + 'https://dotnet.microsoft.com/download/dotnet/8.0'
+           + Chr(13) + Chr(10) + Chr(13) + Chr(10)
+           + 'Pokud je .NET 8.0 jiz nainstalovany, ignorujte tuto zpravu.',
            mbInformation, MB_OK);
 end;
 
@@ -214,10 +216,11 @@ begin
     // Poslední kontrola – BricsCAD by měl být zavřený
     if FindWindowByClassName('BricscadMainWindow') <> 0 then
     begin
-      if MsgBox('BricsCAD je pravděpodobně spuštěný.' + #13#10 +
-                'Doporučujeme jej zavřít před instalací.' + #13#10 +
-                #13#10 +
-                'Pokračovat přesto?',
+      if MsgBox('BricsCAD je pravdepodobne spusteny.'
+                + Chr(13) + Chr(10)
+                + 'Doporucujeme jej zavrit pred instalaci.'
+                + Chr(13) + Chr(10) + Chr(13) + Chr(10)
+                + 'Pokracovat presto?',
                 mbConfirmation, MB_YESNO) = IDNO then
         Result := False;
     end;
@@ -231,15 +234,17 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
-    MsgBox('Instalace dokončena!' + #13#10 +
-           #13#10 +
-           'Plugin se automaticky načte při příštím spuštění BricsCAD.' + #13#10 +
-           #13#10 +
-           'Dostupné příkazy:' + #13#10 +
-           '  VW_LAYERS   – otevře panel vrstev' + #13#10 +
-           '  VW_CLASSES  – otevře panel tříd' + #13#10 +
-           #13#10 +
-           'Panel lze dokovat k okraji nebo použít jako plovoucí okno.',
+    MsgBox('Instalace dokoncena!'
+           + Chr(13) + Chr(10) + Chr(13) + Chr(10)
+           + 'Plugin se automaticky nacte pri pristim spusteni BricsCAD.'
+           + Chr(13) + Chr(10) + Chr(13) + Chr(10)
+           + 'Dostupne prikazy:'
+           + Chr(13) + Chr(10)
+           + '  VW_LAYERS   - otevre panel vrstev'
+           + Chr(13) + Chr(10)
+           + '  VW_CLASSES  - otevre panel trid'
+           + Chr(13) + Chr(10) + Chr(13) + Chr(10)
+           + 'Panel lze dokovat k okraji nebo pouzit jako plovouci okno.',
            mbInformation, MB_OK);
   end;
 end;
