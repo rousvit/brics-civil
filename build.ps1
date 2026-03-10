@@ -181,22 +181,85 @@ if (-not $allFound) {
     exit 1
 }
 
+# Diagnostika – zjistit, jaky .NET framework cili BrxMgd.dll
 Write-Host ""
-& dotnet build $csprojPath -c $Configuration --nologo
+Write-Host "  Diagnostika BrxMgd.dll:" -ForegroundColor Cyan
+$brxDll = Join-Path $libDir "BrxMgd.dll"
+try {
+    $asmName = [System.Reflection.AssemblyName]::GetAssemblyName($brxDll)
+    Write-Host "       Assembly: $($asmName.FullName)" -ForegroundColor Gray
+} catch {
+    Write-Host "       [!] Nelze precist assembly metadata: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+# Precist PE header – zjistit CLR runtime verzi
+try {
+    $fs = [System.IO.File]::OpenRead($brxDll)
+    $br = New-Object System.IO.BinaryReader($fs)
+    # Read PE signature offset from DOS header at 0x3C
+    $fs.Position = 0x3C
+    $peOffset = $br.ReadInt32()
+    $fs.Position = $peOffset
+    $peSignature = $br.ReadInt32()
+    if ($peSignature -eq 0x4550) {
+        # Read COFF header
+        $machine = $br.ReadUInt16()
+        $fs.Position = $peOffset + 24  # Optional header
+        $magic = $br.ReadUInt16()
+        if ($magic -eq 0x20B) {
+            Write-Host "       PE format: PE32+ (64-bit)" -ForegroundColor Gray
+        } else {
+            Write-Host "       PE format: PE32 (32-bit)" -ForegroundColor Gray
+        }
+        # Find CLR header
+        $clrHeaderOffset = if ($magic -eq 0x20B) { $peOffset + 24 + 208 + 14*8 } else { $peOffset + 24 + 192 + 14*8 }
+        $fs.Position = $clrHeaderOffset
+        $clrRva = $br.ReadInt32()
+        $clrSize = $br.ReadInt32()
+        if ($clrRva -gt 0) {
+            Write-Host "       .NET assembly: ANO (CLR header nalezen)" -ForegroundColor Green
+        } else {
+            Write-Host "       .NET assembly: NE (nativni DLL!)" -ForegroundColor Red
+            Write-Host "       Toto je nativni knihovna, nelze referencovat v .NET projektu." -ForegroundColor Red
+        }
+    }
+    $br.Close()
+    $fs.Close()
+} catch {
+    Write-Host "       [!] Chyba pri cteni PE header: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
+# Sestaveni s detailnim logem pro diagnostiku referenci
+Write-Host ""
+$logFile = Join-Path $ScriptDir "build.log"
+Write-Host "  Spoustim build s detailnim logem..." -ForegroundColor Gray
+& dotnet build $csprojPath -c $Configuration --nologo -v:d *> $logFile
 $buildResult = $LASTEXITCODE
 
 if ($buildResult -ne 0) {
     Write-Host ""
     Write-Host "[CHYBA] Sestaveni selhalo! (exit code: $buildResult)" -ForegroundColor Red
     Write-Host ""
-    Write-Host "  Mozne priciny:" -ForegroundColor Yellow
-    Write-Host "  1. BricsCAD neni nainstalovan nebo nebyl nalezen" -ForegroundColor Yellow
-    Write-Host "     -> nainstalujte BricsCAD V25+ (Pro nebo Platinum)" -ForegroundColor Gray
-    Write-Host "     -> nebo zadejte cestu rucne pri pristim spusteni" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "  2. Chybi BricsCAD DLL reference (BrxMgd.dll, TD_Mgd.dll)" -ForegroundColor Yellow
-    Write-Host "     -> ověřte, ze BricsCAD je nainstalovan v:" -ForegroundColor Gray
-    Write-Host "        C:\Program Files\Bricsys\BricsCAD V25\" -ForegroundColor Gray
+
+    # Zobrazit diagnostiku referenci z logu
+    Write-Host "  --- Diagnostika referenci (z build.log) ---" -ForegroundColor Cyan
+    if (Test-Path $logFile) {
+        $logContent = Get-Content $logFile
+        $refLines = $logContent | Where-Object {
+            $_ -match "BrxMgd|TD_Mgd|ResolveAssemblyReference|Could not resolve|reference.*not resolved|HintPath|lib\\.*\.dll"
+        } | Select-Object -First 40
+        if ($refLines) {
+            foreach ($line in $refLines) {
+                Write-Host "  $line" -ForegroundColor DarkGray
+            }
+        } else {
+            Write-Host "  Zadne radky o referencich nalezeny v logu." -ForegroundColor Yellow
+            Write-Host "  Posledních 20 radek logu:" -ForegroundColor Yellow
+            $logContent | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
+        }
+        Write-Host ""
+        Write-Host "  Uplny log ulozen: $logFile" -ForegroundColor Gray
+    }
+
     Write-Host ""
     Read-Host "Stisknete Enter pro zavreni"
     exit 1
