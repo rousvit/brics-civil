@@ -18,9 +18,9 @@ namespace BricsLayerPlugin
         {
             var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
             ed?.WriteMessage("\n=== BricsLayerPlugin (Vectorworks styl) načten ===");
-            ed?.WriteMessage("\nPříkazy: VW_LAYERS, VW_LAYER_NEW, VW_LAYER_STATE, VW_LAYER_UP, VW_LAYER_DOWN");
-            ed?.WriteMessage("\n              VW_LAYER_SYNC, VW_LAYER_LIST");
-            ed?.WriteMessage("\n              VW_CLASS_NEW, VW_CLASS_ASSIGN, VW_CLASS_UPDATE, VW_CLASS_LIST");
+            ed?.WriteMessage("\nVrstvy: VW_LAYERS, VW_LAYER_NEW, VW_LAYER_STATE, VW_LAYER_UP, VW_LAYER_DOWN, VW_LAYER_SYNC");
+            ed?.WriteMessage("\nTřídy:  VW_CLASSES, VW_CLASS_NEW, VW_CLASS_ASSIGN, VW_CLASS_UPDATE, VW_CLASS_LIST");
+            ed?.WriteMessage("\nTip:    Okno lze dokovat přetažením k okraji, nebo použít jako plovoucí panel.");
 
             // Registrovat handler pro otevření dokumentu
             Application.DocumentManager.DocumentActivated += OnDocumentActivated;

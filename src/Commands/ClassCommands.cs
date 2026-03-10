@@ -5,6 +5,7 @@ using Bricscad.Runtime;
 using Teigha.DatabaseServices;
 using BricsLayerPlugin.Managers;
 using BricsLayerPlugin.Models;
+using BricsLayerPlugin.UI;
 
 namespace BricsLayerPlugin.Commands
 {
@@ -13,6 +14,19 @@ namespace BricsLayerPlugin.Commands
     /// </summary>
     public class ClassCommands
     {
+        /// <summary>
+        /// Otevře paletu pro správu tříd (záložka Třídy).
+        /// </summary>
+        [CommandMethod("VW_CLASSES")]
+        public void OpenClassPalette()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+
+            ClassManager.Instance.LoadFromDocument(doc);
+            LayerPaletteHost.ShowClasses();
+        }
+
         /// <summary>
         /// Vytvoří novou třídu.
         /// </summary>

@@ -1,0 +1,19 @@
+Windows Registry Editor Version 5.00
+
+; =============================================================
+; BricsLayerPlugin – automatické načítání při startu BricsCAD
+; =============================================================
+;
+; POUŽITÍ:
+; 1. Upravte cestu k DLL níže (nahraďte C:\\BricsPlugins\\...)
+; 2. Dvakrát klikněte na tento soubor pro import do registru
+; 3. Potvrďte import
+; 4. Restartujte BricsCAD
+;
+; POZNÁMKA: Upravte "V25" podle vaší verze BricsCAD (V24, V25, V26...)
+
+[HKEY_CURRENT_USER\Software\Bricsys\BricsCAD\V25\en_US\Applications\BricsLayerPlugin]
+"DESCRIPTION"="VW Layer Plugin – Vectorworks-style layers and classes"
+"LOADCTRLS"=dword:00000002
+"LOADER"="C:\\BricsPlugins\\BricsLayerPlugin.dll"
+"MANAGED"=dword:00000001
