@@ -37,7 +37,7 @@ namespace BricsLayerPlugin.Commands
             if (doc == null) return;
             var ed = doc.Editor;
 
-            var nameResult = ed.GetString("\nZadejte název nové třídy: ");
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název nové třídy: "));
             if (nameResult.Status != PromptStatus.OK) return;
 
             try
@@ -45,17 +45,25 @@ namespace BricsLayerPlugin.Commands
                 var cls = ClassManager.Instance.CreateClass(nameResult.StringResult);
 
                 // Barva
-                var colorResult = ed.GetInteger("\nZadejte index barvy (1-255): ");
+                var colorOpts = new PromptIntegerOptions("\nZadejte index barvy (1-255): ");
+                colorOpts.DefaultValue = 7;
+                colorOpts.UseDefaultValue = true;
+                var colorResult = ed.GetInteger(colorOpts);
                 if (colorResult.Status == PromptStatus.OK)
                     cls.ColorIndex = colorResult.Value;
 
                 // Typ čáry
-                var ltResult = ed.GetString("\nZadejte typ čáry [Continuous]: ");
+                var ltOpts = new PromptStringOptions("\nZadejte typ čáry [Continuous]: ");
+                ltOpts.AllowSpaces = false;
+                var ltResult = ed.GetString(ltOpts);
                 if (ltResult.Status == PromptStatus.OK && !string.IsNullOrEmpty(ltResult.StringResult))
                     cls.LinetypeName = ltResult.StringResult;
 
                 // Tloušťka
-                var lwResult = ed.GetDouble("\nZadejte tloušťku čáry v mm [0.25]: ");
+                var lwOpts = new PromptDoubleOptions("\nZadejte tloušťku čáry v mm [0.25]: ");
+                lwOpts.DefaultValue = 0.25;
+                lwOpts.UseDefaultValue = true;
+                var lwResult = ed.GetDouble(lwOpts);
                 if (lwResult.Status == PromptStatus.OK)
                     cls.LineweightMm = lwResult.Value;
 
@@ -77,7 +85,7 @@ namespace BricsLayerPlugin.Commands
             if (doc == null) return;
             var ed = doc.Editor;
 
-            var nameResult = ed.GetString("\nZadejte název třídy: ");
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název třídy: "));
             if (nameResult.Status != PromptStatus.OK) return;
 
             var cls = ClassManager.Instance.FindByName(nameResult.StringResult);
@@ -110,7 +118,7 @@ namespace BricsLayerPlugin.Commands
             if (doc == null) return;
             var ed = doc.Editor;
 
-            var nameResult = ed.GetString("\nZadejte název třídy k úpravě: ");
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název třídy k úpravě: "));
             if (nameResult.Status != PromptStatus.OK) return;
 
             var cls = ClassManager.Instance.FindByName(nameResult.StringResult);
@@ -120,15 +128,23 @@ namespace BricsLayerPlugin.Commands
                 return;
             }
 
-            var colorResult = ed.GetInteger($"\nNový index barvy [{cls.ColorIndex}]: ");
+            var colorOpts = new PromptIntegerOptions($"\nNový index barvy [{cls.ColorIndex}]: ");
+            colorOpts.DefaultValue = cls.ColorIndex;
+            colorOpts.UseDefaultValue = true;
+            var colorResult = ed.GetInteger(colorOpts);
             if (colorResult.Status == PromptStatus.OK)
                 cls.ColorIndex = colorResult.Value;
 
-            var ltResult = ed.GetString($"\nNový typ čáry [{cls.LinetypeName}]: ");
+            var ltOpts = new PromptStringOptions($"\nNový typ čáry [{cls.LinetypeName}]: ");
+            ltOpts.AllowSpaces = false;
+            var ltResult = ed.GetString(ltOpts);
             if (ltResult.Status == PromptStatus.OK && !string.IsNullOrEmpty(ltResult.StringResult))
                 cls.LinetypeName = ltResult.StringResult;
 
-            var lwResult = ed.GetDouble($"\nNová tloušťka čáry [{cls.LineweightMm}]: ");
+            var lwOpts = new PromptDoubleOptions($"\nNová tloušťka čáry [{cls.LineweightMm}]: ");
+            lwOpts.DefaultValue = cls.LineweightMm;
+            lwOpts.UseDefaultValue = true;
+            var lwResult = ed.GetDouble(lwOpts);
             if (lwResult.Status == PromptStatus.OK)
                 cls.LineweightMm = lwResult.Value;
 

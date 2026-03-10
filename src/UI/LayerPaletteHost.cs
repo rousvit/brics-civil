@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Windows.Forms.Integration;
 using Bricscad.Windows;
 
 namespace BricsLayerPlugin.UI
@@ -31,7 +32,6 @@ namespace BricsLayerPlugin.UI
                 CreatePaletteSet();
 
             _paletteSet!.Visible = true;
-            _paletteSet.Activate(0); // Záložka Vrstvy
         }
 
         /// <summary>
@@ -43,7 +43,6 @@ namespace BricsLayerPlugin.UI
                 CreatePaletteSet();
 
             _paletteSet!.Visible = true;
-            _paletteSet.Activate(1); // Záložka Třídy
         }
 
         public static void Hide()
@@ -68,7 +67,7 @@ namespace BricsLayerPlugin.UI
 
             // Dokování vlevo/vpravo (jako panel Vlastnosti v BricsCAD)
             _paletteSet.DockEnabled =
-                DockSides.Left | DockSides.Right | DockSides.None;
+                (DockSides)((int)DockSides.Left | (int)DockSides.Right);
 
             // Minimální velikost
             _paletteSet.MinimumSize = new Size(320, 450);
@@ -76,19 +75,17 @@ namespace BricsLayerPlugin.UI
             // Výchozí velikost plovoucího okna
             _paletteSet.Size = new Size(380, 600);
 
-            // Styl – zavírací tlačítko, auto-hide, přichytávání, menu vlastností
+            // Styl – zavírací tlačítko, auto-hide, menu vlastností
             _paletteSet.Style =
                 PaletteSetStyles.ShowCloseButton |
                 PaletteSetStyles.ShowAutoHideButton |
-                PaletteSetStyles.Snappable |
-                PaletteSetStyles.ShowPropertiesMenu |
-                PaletteSetStyles.UsePaletteNameAsTitleForSingle;
+                PaletteSetStyles.ShowPropertiesMenu;
 
-            _paletteSet.KeepFocus = false;
-
-            // --- Záložky ---
-            _paletteSet.AddVisual("Vrstvy", new LayerPaletteControl());
-            _paletteSet.AddVisual("Třídy", new ClassPaletteControl());
+            // --- Záložky (WPF přes ElementHost) ---
+            var layerHost = new ElementHost { Child = new LayerPaletteControl() };
+            var classHost = new ElementHost { Child = new ClassPaletteControl() };
+            _paletteSet.Add("Vrstvy", layerHost);
+            _paletteSet.Add("Třídy", classHost);
 
             // Výchozí stav – plovoucí okno
             _paletteSet.Dock = DockSides.None;

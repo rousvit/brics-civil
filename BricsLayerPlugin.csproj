@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <LangVersion>latest</LangVersion>
     <RootNamespace>BricsLayerPlugin</RootNamespace>
     <AssemblyName>BricsLayerPlugin</AssemblyName>

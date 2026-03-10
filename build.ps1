@@ -243,22 +243,42 @@ if ($buildResult -ne 0) {
     Write-Host "[CHYBA] Sestaveni selhalo! (exit code: $buildResult)" -ForegroundColor Red
     Write-Host ""
 
-    # Zobrazit diagnostiku referenci z logu
-    Write-Host "  --- Diagnostika referenci (z build.log) ---" -ForegroundColor Cyan
+    # Zobrazit skutecne chyby kompilace z logu
     if (Test-Path $logFile) {
         $logContent = Get-Content $logFile
-        $refLines = $logContent | Where-Object {
-            $_ -match "BrxMgd|TD_Mgd|ResolveAssemblyReference|Could not resolve|reference.*not resolved|HintPath|lib\\.*\.dll"
-        } | Select-Object -First 40
-        if ($refLines) {
-            foreach ($line in $refLines) {
-                Write-Host "  $line" -ForegroundColor DarkGray
+
+        # 1) Zobrazit chyby kompilace (CS* error kody)
+        Write-Host "  --- Chyby kompilace ---" -ForegroundColor Cyan
+        $errorLines = $logContent | Where-Object {
+            $_ -match "error CS\d+" -or $_ -match ": error " -or $_ -match "error MSB\d+"
+        } | Select-Object -First 30
+        if ($errorLines) {
+            foreach ($line in $errorLines) {
+                Write-Host "  $($line.Trim())" -ForegroundColor Red
             }
         } else {
-            Write-Host "  Zadne radky o referencich nalezeny v logu." -ForegroundColor Yellow
-            Write-Host "  Posledních 20 radek logu:" -ForegroundColor Yellow
-            $logContent | Select-Object -Last 20 | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
+            Write-Host "  Zadne CS/MSB chyby nenalezeny." -ForegroundColor Yellow
         }
+
+        # 2) Zobrazit varovani
+        $warnLines = $logContent | Where-Object {
+            $_ -match "warning CS\d+" -or $_ -match ": warning "
+        } | Select-Object -First 10
+        if ($warnLines) {
+            Write-Host ""
+            Write-Host "  --- Varovani ---" -ForegroundColor Yellow
+            foreach ($line in $warnLines) {
+                Write-Host "  $($line.Trim())" -ForegroundColor Yellow
+            }
+        }
+
+        # 3) Pokud nebyly nalezeny zadne chyby, zobrazit konec logu
+        if (-not $errorLines) {
+            Write-Host ""
+            Write-Host "  --- Poslednich 30 radek build logu ---" -ForegroundColor Cyan
+            $logContent | Select-Object -Last 30 | ForEach-Object { Write-Host "  $_" -ForegroundColor DarkGray }
+        }
+
         Write-Host ""
         Write-Host "  Uplny log ulozen: $logFile" -ForegroundColor Gray
     }

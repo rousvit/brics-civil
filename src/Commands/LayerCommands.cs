@@ -37,7 +37,7 @@ namespace BricsLayerPlugin.Commands
             if (doc == null) return;
             var ed = doc.Editor;
 
-            var nameResult = ed.GetString("\nZadejte název nové vrstvy: ");
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název nové vrstvy: "));
             if (nameResult.Status != PromptStatus.OK) return;
 
             try
@@ -62,7 +62,7 @@ namespace BricsLayerPlugin.Commands
             if (doc == null) return;
             var ed = doc.Editor;
 
-            var nameResult = ed.GetString("\nZadejte název vrstvy: ");
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název vrstvy: "));
             if (nameResult.Status != PromptStatus.OK) return;
 
             var layer = LayerManager.Instance.FindByName(nameResult.StringResult);
@@ -98,7 +98,7 @@ namespace BricsLayerPlugin.Commands
             if (doc == null) return;
             var ed = doc.Editor;
 
-            var nameResult = ed.GetString("\nZadejte název vrstvy k posunutí nahoru: ");
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název vrstvy k posunutí nahoru: "));
             if (nameResult.Status != PromptStatus.OK) return;
 
             var layer = LayerManager.Instance.FindByName(nameResult.StringResult);
@@ -123,7 +123,7 @@ namespace BricsLayerPlugin.Commands
             if (doc == null) return;
             var ed = doc.Editor;
 
-            var nameResult = ed.GetString("\nZadejte název vrstvy k posunutí dolů: ");
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název vrstvy k posunutí dolů: "));
             if (nameResult.Status != PromptStatus.OK) return;
 
             var layer = LayerManager.Instance.FindByName(nameResult.StringResult);
