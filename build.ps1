@@ -6,6 +6,7 @@
 #   .\build.ps1                    # Sestaví plugin + vytvoří instalátor
 #   .\build.ps1 -SkipInstaller     # Pouze sestaví plugin (bez instalátoru)
 #   .\build.ps1 -DownloadDotNet    # Stáhne .NET Runtime pro offline instalaci
+#   .\build.ps1 -ZipOnly           # Sestaví plugin + vytvoří přenosný ZIP (bez Inno Setup)
 #
 # POŽADAVKY:
 #   - .NET 8.0 SDK (https://dotnet.microsoft.com/download)
@@ -16,9 +17,11 @@
 
 param(
     [switch]$SkipInstaller,
+    [switch]$ZipOnly,
     [switch]$DownloadDotNet,
     [string]$Configuration = "Release",
-    [string]$BricsCADPath = ""
+    [string]$BricsCADPath = "",
+    [string]$Version = "1.0.0"
 )
 
 # DULEZITE: Nesmime pouzit "Stop" – jinak se pri chybe PowerShell ukonci
@@ -117,7 +120,7 @@ $env:BricsCADPath = $BricsCADPath
 # 2. Kontrola .NET SDK
 # ---------------------------------------------------------------
 Write-Host ""
-Write-Host "[1/4] Kontroluji .NET SDK..." -ForegroundColor White
+Write-Host "[1/5] Kontroluji .NET SDK..." -ForegroundColor White
 
 $dotnetExe = Get-Command dotnet -ErrorAction SilentlyContinue
 if (-not $dotnetExe) {
@@ -140,7 +143,7 @@ Write-Host "       .NET SDK: $dotnetVersion" -ForegroundColor Gray
 # 3. Sestavení pluginu
 # ---------------------------------------------------------------
 Write-Host ""
-Write-Host "[2/4] Sestavuji plugin ($Configuration)..." -ForegroundColor White
+Write-Host "[2/5] Sestavuji plugin ($Configuration)..." -ForegroundColor White
 
 if ($BricsCADPath) {
     Write-Host "       BricsCAD: $BricsCADPath" -ForegroundColor Gray
@@ -288,7 +291,7 @@ Write-Host "[OK] Build uspesny" -ForegroundColor Green
 # ---------------------------------------------------------------
 if ($DownloadDotNet) {
     Write-Host ""
-    Write-Host "[3/4] Stahuji .NET 8.0 Desktop Runtime..." -ForegroundColor White
+    Write-Host "[3/5] Stahuji .NET 8.0 Desktop Runtime..." -ForegroundColor White
 
     $depsDir = "$ScriptDir\install\deps"
     if (-not (Test-Path $depsDir)) {
@@ -319,19 +322,96 @@ if ($DownloadDotNet) {
     }
 } else {
     Write-Host ""
-    Write-Host "[3/4] Preskakuji stazeni .NET Runtime" -ForegroundColor Gray
+    Write-Host "[3/5] Preskakuji stazeni .NET Runtime" -ForegroundColor Gray
     Write-Host "       (pouzijte -DownloadDotNet pro offline instalator)" -ForegroundColor Gray
 }
 
 # ---------------------------------------------------------------
-# 5. Vytvoření instalátoru
+# 5. Vytvoření přenosného ZIP balíčku
 # ---------------------------------------------------------------
-if ($SkipInstaller) {
+if ($ZipOnly -or -not $SkipInstaller) {
     Write-Host ""
-    Write-Host "[4/4] Preskakuji tvorbu instalatoru (-SkipInstaller)" -ForegroundColor Gray
+    Write-Host "[+] Vytvarim prenosny ZIP balicek..." -ForegroundColor White
+
+    $distDir = "$ScriptDir\dist"
+    if (-not (Test-Path $distDir)) {
+        New-Item -ItemType Directory -Path $distDir | Out-Null
+    }
+
+    $packageDir = "$distDir\BricsLayerPlugin_$Version"
+    if (Test-Path $packageDir) {
+        Remove-Item -Recurse -Force $packageDir
+    }
+    New-Item -ItemType Directory -Path $packageDir | Out-Null
+
+    # Zkopírovat plugin DLL
+    Copy-Item "$dllPath" "$packageDir\" -Force
+    $pdbPath = Join-Path $outputDir "BricsLayerPlugin.pdb"
+    if (Test-Path $pdbPath) {
+        Copy-Item "$pdbPath" "$packageDir\" -Force
+    }
+
+    # Zkopírovat instalační skripty
+    if (Test-Path "$ScriptDir\install\install.bat") {
+        Copy-Item "$ScriptDir\install\install.bat" "$packageDir\" -Force
+    }
+    if (Test-Path "$ScriptDir\install\uninstall.bat") {
+        Copy-Item "$ScriptDir\install\uninstall.bat" "$packageDir\" -Force
+    }
+    if (Test-Path "$ScriptDir\install\autoload.reg") {
+        Copy-Item "$ScriptDir\install\autoload.reg" "$packageDir\" -Force
+    }
+
+    # Vytvořit README
+    $readme = @"
+BricsLayerPlugin v$Version
+================================
+
+Plugin pro BricsCAD - vrstvy a tridy ve stylu Vectorworks.
+
+INSTALACE:
+1. Spustte install.bat (jako spravce)
+   - Zkopiruje plugin do C:\BricsPlugins\
+   - Zaregistruje auto-load v registru
+2. Spustte BricsCAD
+3. Zadejte: VW_LAYERS
+
+RUCNI NACTENI:
+1. V BricsCAD zadejte: NETLOAD
+2. Vyberte BricsLayerPlugin.dll
+3. Zadejte: VW_LAYERS
+
+ODINSTALACE:
+   Spustte uninstall.bat
+
+POZADAVKY:
+- BricsCAD V25+ (Pro nebo Platinum)
+- .NET 8.0 Desktop Runtime
+  https://dotnet.microsoft.com/download/dotnet/8.0
+"@
+    Set-Content -Path "$packageDir\PRECTIMNE.txt" -Value $readme -Encoding UTF8
+
+    # Vytvořit ZIP
+    $zipFile = "$distDir\BricsLayerPlugin_$Version.zip"
+    if (Test-Path $zipFile) { Remove-Item $zipFile -Force }
+    Compress-Archive -Path "$packageDir\*" -DestinationPath $zipFile -Force
+
+    $zipSize = [math]::Round((Get-Item $zipFile).Length / 1KB, 1)
+    Write-Host "[OK] ZIP balicek vytvoren: $zipFile ($zipSize KB)" -ForegroundColor Green
+
+    # Uklidit rozbalený adresář
+    Remove-Item -Recurse -Force $packageDir
+}
+
+# ---------------------------------------------------------------
+# 6. Vytvoření instalátoru (Inno Setup)
+# ---------------------------------------------------------------
+if ($SkipInstaller -or $ZipOnly) {
+    Write-Host ""
+    Write-Host "[5/5] Preskakuji tvorbu instalatoru" -ForegroundColor Gray
 } else {
     Write-Host ""
-    Write-Host "[4/4] Vytvarim instalator (Inno Setup)..." -ForegroundColor White
+    Write-Host "[5/5] Vytvarim instalator (Inno Setup)..." -ForegroundColor White
 
     # Najít Inno Setup Compiler
     $isccPaths = @(
@@ -384,14 +464,19 @@ Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  Hotovo!" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  Plugin DLL: $dllPath" -ForegroundColor White
+Write-Host "  Plugin DLL:  $dllPath" -ForegroundColor White
 
-if (-not $SkipInstaller -and $iscc) {
-    Write-Host "  Instalator:  $distDir\BricsLayerPlugin_Setup_1.0.0.exe" -ForegroundColor White
+$zipFile = "$ScriptDir\dist\BricsLayerPlugin_$Version.zip"
+if (Test-Path $zipFile) {
+    Write-Host "  ZIP balicek: $zipFile" -ForegroundColor White
+}
+
+if (-not $SkipInstaller -and -not $ZipOnly -and $iscc) {
+    Write-Host "  Instalator:  $ScriptDir\dist\BricsLayerPlugin_Setup_$Version.exe" -ForegroundColor White
 }
 
 Write-Host ""
 Write-Host "  Dalsi kroky:" -ForegroundColor Gray
-Write-Host "    1. Spustte instalator (nebo: NETLOAD v BricsCAD)" -ForegroundColor Gray
+Write-Host "    1. Spustte instalator / rozbalte ZIP (nebo: NETLOAD v BricsCAD)" -ForegroundColor Gray
 Write-Host "    2. V BricsCAD zadejte: VW_LAYERS" -ForegroundColor Gray
 Write-Host ""

@@ -1,0 +1,373 @@
+# =============================================================
+# BricsLayerPlugin – Automatický build & release
+# =============================================================
+#
+# Tento workflow:
+# 1. Sestaví plugin na Windows s .NET 8.0
+# 2. Vytvoří přenosný ZIP balíček
+# 3. Vytvoří Inno Setup instalátor (pokud je dostupný)
+# 4. Nahraje artefakty ke stažení
+#
+# Spouští se při:
+# - Push do main/master větve
+# - Pull request do main/master
+# - Ruční spuštění (workflow_dispatch)
+# - Vytvoření tagu v*/v* (release build)
+
+name: Build & Package
+
+on:
+  push:
+    branches: [master, main]
+    tags: ['v*']
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  BUILD_CONFIGURATION: Release
+
+jobs:
+  build:
+    name: Build Plugin
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Display .NET info
+        run: dotnet --info
+
+      # BricsCAD není na CI dostupný – vytvoříme stub DLL pro kompilaci
+      - name: Create BricsCAD stub DLLs
+        shell: pwsh
+        run: |
+          $libDir = "lib"
+          if (-not (Test-Path $libDir)) { New-Item -ItemType Directory -Path $libDir | Out-Null }
+
+          # Vytvoříme minimální stub DLL pro každou referenci
+          # Tyto DLL stačí pro kompilaci – plugin se za běhu připojí ke skutečným BricsCAD DLL
+          $stubSource = @"
+          // Stub assembly pro CI build
+          using System;
+          using System.Reflection;
+          [assembly: AssemblyVersion("1.0.0.0")]
+          namespace Teigha.DatabaseServices {
+              public class Database { }
+              public class Transaction : IDisposable {
+                  public void Dispose() { }
+                  public void Commit() { }
+                  public object GetObject(object id, object mode) { return null; }
+              }
+              public class BlockTable { }
+              public class BlockTableRecord {
+                  public void AppendEntity(object entity) { }
+              }
+              public class LayerTable { }
+              public class LayerTableRecord {
+                  public string Name { get; set; }
+                  public bool IsOff { get; set; }
+                  public bool IsLocked { get; set; }
+                  public short ColorIndex { get; set; }
+                  public object LinetypeObjectId { get; set; }
+                  public object LineWeight { get; set; }
+              }
+              public class LinetypeTable { }
+              public class LinetypeTableRecord {
+                  public string Name { get; set; }
+              }
+              public class Entity {
+                  public string Layer { get; set; }
+                  public short ColorIndex { get; set; }
+                  public object LinetypeId { get; set; }
+                  public object LineWeight { get; set; }
+              }
+              public class DrawOrderTable {
+                  public void MoveToTop(object ids) { }
+                  public void MoveToBottom(object ids) { }
+              }
+              public class ObjectId { public bool IsNull { get; } public bool IsValid { get; } }
+              public class ObjectIdCollection : System.Collections.CollectionBase {
+                  public ObjectIdCollection() { }
+                  public ObjectIdCollection(ObjectId[] ids) { }
+                  public void Add(ObjectId id) { }
+              }
+              public class ResultBuffer : IDisposable {
+                  public ResultBuffer(params TypedValue[] args) { }
+                  public void Dispose() { }
+              }
+              public class TypedValue {
+                  public TypedValue(int code, object value) { }
+                  public int TypeCode { get; }
+                  public object Value { get; }
+              }
+              public class RegAppTable { }
+              public class RegAppTableRecord {
+                  public string Name { get; set; }
+              }
+              public class SymbolUtilityServices {
+                  public static bool IsCompatibilityMode { get; }
+              }
+              public enum OpenMode { ForRead, ForWrite, ForNotify }
+              public enum LineWeight { LineWeight000 = 0, LineWeight013 = 13, LineWeight025 = 25, LineWeight050 = 50, LineWeight100 = 100 }
+          }
+          namespace Teigha.Runtime {
+              [System.AttributeUsage(System.AttributeTargets.Assembly)] public class ExtensionApplicationAttribute : System.Attribute { public ExtensionApplicationAttribute(System.Type t) { } }
+              [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)] public class CommandClassAttribute : System.Attribute { public CommandClassAttribute(System.Type t) { } }
+              [System.AttributeUsage(System.AttributeTargets.Method)] public class CommandMethodAttribute : System.Attribute { public CommandMethodAttribute(string name) { } }
+              public interface IExtensionApplication { void Initialize(); void Terminate(); }
+              public class RXObject { }
+              public class DisposableWrapper : System.IDisposable { public void Dispose() { } }
+              public enum DxfCode { ExtendedDataRegAppName = 1001, ExtendedDataAsciiString = 1000 }
+          }
+          namespace Teigha.Colors {
+              public class Color {
+                  public static Color FromColorIndex(object method, short index) { return new Color(); }
+                  public short ColorIndex { get; }
+              }
+              public enum ColorMethod { ByAci, ByLayer, ByBlock }
+          }
+          namespace Teigha.Geometry {
+              public struct Point3d {
+                  public double X; public double Y; public double Z;
+                  public Point3d(double x, double y, double z) { X = x; Y = y; Z = z; }
+              }
+          }
+          namespace Bricscad.ApplicationServices {
+              public class Application {
+                  public static DocumentManager DocumentManager { get; }
+              }
+              public class DocumentManager {
+                  public Document MdiActiveDocument { get; }
+                  public event System.EventHandler<DocumentCollectionEventArgs> DocumentActivated;
+              }
+              public class Document {
+                  public Database Database { get; }
+                  public Editor Editor { get; }
+                  public object LockDocument() { return null; }
+              }
+              public class Database { }
+              public class DocumentCollectionEventArgs : System.EventArgs {
+                  public Document Document { get; }
+              }
+              public class Editor { }
+          }
+          namespace Bricscad.EditorInput {
+              public class Editor {
+                  public void WriteMessage(string msg) { }
+                  public void WriteMessage(string fmt, params object[] args) { }
+                  public PromptResult GetString(PromptStringOptions opts) { return new PromptResult(); }
+                  public PromptResult GetKeywords(PromptStringOptions opts) { return new PromptResult(); }
+                  public PromptIntegerResult GetInteger(PromptIntegerOptions opts) { return new PromptIntegerResult(); }
+                  public PromptSelectionResult GetSelection() { return new PromptSelectionResult(); }
+              }
+              public class PromptStringOptions {
+                  public PromptStringOptions(string msg) { }
+                  public bool AllowSpaces { get; set; }
+                  public object Keywords { get; }
+              }
+              public class PromptIntegerOptions {
+                  public PromptIntegerOptions(string msg) { }
+                  public int DefaultValue { get; set; }
+                  public bool UseDefaultValue { get; set; }
+              }
+              public class PromptResult {
+                  public PromptStatus Status { get; }
+                  public string StringResult { get; }
+              }
+              public class PromptIntegerResult {
+                  public PromptStatus Status { get; }
+                  public int Value { get; }
+              }
+              public class PromptSelectionResult {
+                  public PromptStatus Status { get; }
+                  public SelectionSet Value { get; }
+              }
+              public class SelectionSet {
+                  public ObjectId[] GetObjectIds() { return new ObjectId[0]; }
+              }
+              public class ObjectId { }
+              public enum PromptStatus { OK, Cancel, Error, None, Keyword }
+              public class KeywordCollection {
+                  public void Add(string kw) { }
+              }
+          }
+          namespace Bricscad.Windows {
+              public class PaletteSet : System.IDisposable {
+                  public PaletteSet(string name, System.Guid guid) { }
+                  public void AddVisual(string name, object control) { }
+                  public bool Visible { get; set; }
+                  public int Style { get; set; }
+                  public object DockEnabled { get; set; }
+                  public object Size { get; set; }
+                  public object MinimumSize { get; set; }
+                  public void Dispose() { }
+              }
+              public enum PaletteSetStyles { ShowCloseButton = 1, ShowAutoHideButton = 2 }
+              public enum DockSides { None = 0, Left = 1, Right = 2 }
+          }
+          "@
+
+          # Pro zjednodušení CI buildu vytvoříme jednoduché reference
+          # Použijeme dotnet k vytvoření DLL ze zdrojového kódu
+          $stubProject = @"
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net8.0-windows</TargetFramework>
+              <AssemblyName>BrxMgd</AssemblyName>
+              <RootNamespace>BrxMgdStub</RootNamespace>
+              <UseWPF>true</UseWPF>
+            </PropertyGroup>
+          </Project>
+          "@
+
+          $stubDir = "stub-build"
+          New-Item -ItemType Directory -Path $stubDir -Force | Out-Null
+          Set-Content -Path "$stubDir\Stub.cs" -Value $stubSource
+          Set-Content -Path "$stubDir\stub.csproj" -Value $stubProject
+
+          dotnet build "$stubDir\stub.csproj" -c Release --nologo -v:q
+
+          # Zkopírovat výstupní DLL jako všechny tři reference
+          $stubDll = "$stubDir\bin\Release\net8.0-windows\BrxMgd.dll"
+          if (Test-Path $stubDll) {
+              Copy-Item $stubDll "$libDir\BrxMgd.dll" -Force
+              Copy-Item $stubDll "$libDir\TD_Mgd.dll" -Force
+              Copy-Item $stubDll "$libDir\TD_MgdBrep.dll" -Force
+              Write-Host "Stub DLLs created successfully in lib/"
+          } else {
+              Write-Host "::error::Failed to create stub DLLs"
+              exit 1
+          }
+
+          # Cleanup
+          Remove-Item -Recurse -Force $stubDir
+
+      - name: Build plugin
+        run: dotnet build BricsLayerPlugin.csproj -c ${{ env.BUILD_CONFIGURATION }} --nologo
+
+      - name: Extract version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref }}" -match "refs/tags/v(.+)") {
+              $version = $Matches[1]
+          } else {
+              $version = "1.0.0-build.${{ github.run_number }}"
+          }
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Version: $version"
+
+      # Vytvořit přenosný ZIP balíček
+      - name: Create portable ZIP package
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $outputDir = "bin\${{ env.BUILD_CONFIGURATION }}\net8.0-windows"
+          $packageDir = "dist\BricsLayerPlugin_$version"
+          $zipFile = "dist\BricsLayerPlugin_$version.zip"
+
+          # Vytvořit strukturu balíčku
+          New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
+
+          # Zkopírovat plugin DLL
+          Copy-Item "$outputDir\BricsLayerPlugin.dll" $packageDir -Force
+          if (Test-Path "$outputDir\BricsLayerPlugin.pdb") {
+              Copy-Item "$outputDir\BricsLayerPlugin.pdb" $packageDir -Force
+          }
+
+          # Zkopírovat instalační skripty
+          Copy-Item "install\install.bat" $packageDir -Force
+          Copy-Item "install\uninstall.bat" $packageDir -Force
+          Copy-Item "install\autoload.reg" $packageDir -Force
+
+          # Vytvořit README pro uživatele
+          @"
+          BricsLayerPlugin v$version
+          ================================
+
+          Plugin pro BricsCAD - vrstvy a tridy ve stylu Vectorworks.
+
+          INSTALACE:
+          1. Spustte install.bat (jako spravce)
+             - Zkopiruje plugin do C:\BricsPlugins\
+             - Zaregistruje auto-load v registru
+          2. Spustte BricsCAD
+          3. Zadejte: VW_LAYERS
+
+          RUCNI NACTENI:
+          1. V BricsCAD zadejte: NETLOAD
+          2. Vyberte BricsLayerPlugin.dll
+          3. Zadejte: VW_LAYERS
+
+          ODINSTALACE:
+             Spustte uninstall.bat
+
+          POZADAVKY:
+          - BricsCAD V25+ (Pro nebo Platinum)
+          - .NET 8.0 Desktop Runtime
+            https://dotnet.microsoft.com/download/dotnet/8.0
+          "@ | Set-Content "$packageDir\CTIME.txt"
+
+          # Vytvořit ZIP
+          Compress-Archive -Path "$packageDir\*" -DestinationPath $zipFile -Force
+          Write-Host "ZIP package created: $zipFile"
+          Write-Host "Size: $([math]::Round((Get-Item $zipFile).Length / 1KB, 1)) KB"
+
+      # Inno Setup instalátor (volitelný – závisí na dostupnosti ISCC)
+      - name: Setup Inno Setup
+        uses: Minionguyjpro/Inno-Setup-Action@v1.2.5
+        with:
+          path: install/BricsLayerPlugin.iss
+        continue-on-error: true
+        id: inno
+
+      - name: Upload plugin DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: BricsLayerPlugin-DLL-${{ steps.version.outputs.VERSION }}
+          path: bin/${{ env.BUILD_CONFIGURATION }}/net8.0-windows/BricsLayerPlugin.dll
+
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: BricsLayerPlugin-Portable-${{ steps.version.outputs.VERSION }}
+          path: dist/BricsLayerPlugin_*.zip
+
+      - name: Upload installer EXE
+        if: steps.inno.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: BricsLayerPlugin-Setup-${{ steps.version.outputs.VERSION }}
+          path: dist/BricsLayerPlugin_Setup_*.exe
+
+  # Release – pouze při tagu v*
+  release:
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.exe
+            artifacts/**/*.dll

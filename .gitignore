@@ -10,3 +10,5 @@ dist/
 install/deps/
 Directory.Build.props
 lib/
+build.log
+stub-build/
