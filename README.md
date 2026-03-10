@@ -57,7 +57,42 @@ Otevření: příkaz `VW_LAYERS` nebo `VW_CLASSES`.
 
 ---
 
-## Podrobný návod k nasazení (krok za krokem)
+## Instalace pomocí EXE instalátoru (nejjednodušší)
+
+Pokud máte hotový instalátor `BricsLayerPlugin_Setup_1.0.0.exe`:
+
+1. **Zavřete BricsCAD** (pokud běží)
+2. **Dvakrát klikněte** na `BricsLayerPlugin_Setup_1.0.0.exe`
+3. Instalátor automaticky:
+   - Nabídne instalaci .NET 8.0 Runtime (pokud chybí)
+   - Detekuje nainstalovanou verzi BricsCAD
+   - Zkopíruje plugin do zvolené složky
+   - Zaregistruje automatické načítání
+4. **Spusťte BricsCAD** – plugin se načte automaticky
+5. Zadejte `VW_LAYERS` pro otevření panelu
+
+### Sestavení instalátoru (pro vývojáře)
+
+```cmd
+REM Jednoduše dvakrát klikněte na:
+build.cmd
+
+REM Nebo z PowerShell:
+.\build.ps1
+
+REM S offline .NET Runtime balíčkem:
+.\build.ps1 -DownloadDotNet
+```
+
+Požadavky pro sestavení instalátoru:
+- [Inno Setup 6](https://jrsoftware.org/isdownload.php) – `winget install JRSoftware.InnoSetup`
+- .NET 8.0 SDK
+
+Výstup: `dist\BricsLayerPlugin_Setup_1.0.0.exe`
+
+---
+
+## Podrobný návod k nasazení (ruční, krok za krokem)
 
 ### Krok 1: Požadavky
 

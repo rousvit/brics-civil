@@ -6,3 +6,5 @@ obj/
 *.dll
 *.pdb
 *.cache
+dist/
+install/deps/
