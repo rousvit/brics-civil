@@ -438,8 +438,27 @@ if ($SkipInstaller -or $ZipOnly) {
         "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
         "${env:ProgramFiles}\Inno Setup 6\ISCC.exe",
         "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-        "C:\Program Files\Inno Setup 6\ISCC.exe"
+        "C:\Program Files\Inno Setup 6\ISCC.exe",
+        "${env:LOCALAPPDATA}\Programs\Inno Setup 6\ISCC.exe",
+        "${env:USERPROFILE}\AppData\Local\Programs\Inno Setup 6\ISCC.exe",
+        "${env:LOCALAPPDATA}\Inno Setup 6\ISCC.exe"
     )
+
+    # Také zkusit najít přes registry nebo PATH
+    if (-not ($isccPaths | Where-Object { Test-Path $_ })) {
+        $regPath = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1" -ErrorAction SilentlyContinue
+        if (-not $regPath) {
+            $regPath = Get-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1" -ErrorAction SilentlyContinue
+        }
+        if ($regPath -and $regPath.InstallLocation) {
+            $isccPaths += Join-Path $regPath.InstallLocation "ISCC.exe"
+        }
+        # Zkusit najít přes where.exe
+        $whereResult = & where.exe ISCC.exe 2>$null
+        if ($whereResult) {
+            $isccPaths += $whereResult
+        }
+    }
 
     $iscc = $null
     foreach ($path in $isccPaths) {
@@ -451,6 +470,12 @@ if ($SkipInstaller -or $ZipOnly) {
 
     if (-not $iscc) {
         Write-Host "[!] Inno Setup nebyl nalezen!" -ForegroundColor Yellow
+        Write-Host "    Prohledane cesty:" -ForegroundColor Gray
+        foreach ($p in $isccPaths) { Write-Host "      $p" -ForegroundColor Gray }
+        Write-Host ""
+        Write-Host "    Zkuste zjistit umisteni:" -ForegroundColor Cyan
+        Write-Host "      Get-ChildItem -Path C:\ -Recurse -Filter ISCC.exe -ErrorAction SilentlyContinue | Select FullName" -ForegroundColor Cyan
+        Write-Host ""
         Write-Host "    Nainstalujte: winget install JRSoftware.InnoSetup" -ForegroundColor Cyan
         Write-Host "    nebo stahnete z: https://jrsoftware.org/isdownload.php" -ForegroundColor Cyan
         Write-Host ""
