@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using Bricscad.ApplicationServices;
+using BcadApplication = Bricscad.ApplicationServices.Application;
 using BricsLayerPlugin.Managers;
 using BricsLayerPlugin.Models;
 
@@ -30,7 +31,7 @@ namespace BricsLayerPlugin.UI
             if (LayerListView.SelectedItem is VwLayer layer)
             {
                 LayerManager.Instance.MoveUp(layer);
-                var doc = Application.DocumentManager.MdiActiveDocument;
+                var doc = BcadApplication.DocumentManager.MdiActiveDocument;
                 if (doc != null)
                     LayerManager.Instance.SyncDrawOrder(doc);
             }
@@ -41,7 +42,7 @@ namespace BricsLayerPlugin.UI
             if (LayerListView.SelectedItem is VwLayer layer)
             {
                 LayerManager.Instance.MoveDown(layer);
-                var doc = Application.DocumentManager.MdiActiveDocument;
+                var doc = BcadApplication.DocumentManager.MdiActiveDocument;
                 if (doc != null)
                     LayerManager.Instance.SyncDrawOrder(doc);
             }
@@ -49,7 +50,7 @@ namespace BricsLayerPlugin.UI
 
         private void AddLayer_Click(object sender, RoutedEventArgs e)
         {
-            var doc = Application.DocumentManager.MdiActiveDocument;
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
             // Jednoduchý input dialog
@@ -61,7 +62,7 @@ namespace BricsLayerPlugin.UI
                 LayerManager.Instance.CreateLayer(name, doc);
                 LayerManager.Instance.SyncDrawOrder(doc);
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -77,14 +78,14 @@ namespace BricsLayerPlugin.UI
 
             if (result != MessageBoxResult.Yes) return;
 
-            var doc = Application.DocumentManager.MdiActiveDocument;
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
             try
             {
                 LayerManager.Instance.DeleteLayer(layer, doc, "0");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -92,14 +93,14 @@ namespace BricsLayerPlugin.UI
 
         private void Refresh_Click(object sender, RoutedEventArgs e)
         {
-            var doc = Application.DocumentManager.MdiActiveDocument;
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc != null)
                 LayerManager.Instance.LoadFromDocument(doc);
         }
 
         private void SyncOrder_Click(object sender, RoutedEventArgs e)
         {
-            var doc = Application.DocumentManager.MdiActiveDocument;
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc != null)
                 LayerManager.Instance.SyncDrawOrder(doc);
         }
@@ -114,7 +115,7 @@ namespace BricsLayerPlugin.UI
             if (sender is not ComboBox combo) return;
             if (combo.DataContext is not VwLayer layer) return;
 
-            var doc = Application.DocumentManager.MdiActiveDocument;
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
             var stateText = (combo.SelectedItem as ComboBoxItem)?.Content?.ToString();

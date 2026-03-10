@@ -69,7 +69,7 @@ namespace BricsLayerPlugin.Commands
 
                 ed.WriteMessage($"\nTřída '{cls.Name}' vytvořena: {cls}");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 ed.WriteMessage($"\nChyba: {ex.Message}");
             }

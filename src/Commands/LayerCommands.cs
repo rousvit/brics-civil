@@ -46,7 +46,7 @@ namespace BricsLayerPlugin.Commands
                 ed.WriteMessage($"\nVrstva '{nameResult.StringResult}' byla vytvořena.");
                 LayerManager.Instance.SyncDrawOrder(doc);
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 ed.WriteMessage($"\nChyba: {ex.Message}");
             }

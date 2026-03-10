@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Bricscad.ApplicationServices;
+using BcadApplication = Bricscad.ApplicationServices.Application;
 using BricsLayerPlugin.Managers;
 using BricsLayerPlugin.Models;
 
@@ -52,7 +53,7 @@ namespace BricsLayerPlugin.UI
 
                 RefreshList();
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -68,7 +69,7 @@ namespace BricsLayerPlugin.UI
 
             if (result != MessageBoxResult.Yes) return;
 
-            var doc = Application.DocumentManager.MdiActiveDocument;
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
             ClassManager.Instance.DeleteClass(cls, doc);
@@ -90,7 +91,7 @@ namespace BricsLayerPlugin.UI
             if (lwDialog.ShowDialog() == true && double.TryParse(lwDialog.InputText, out var lw))
                 cls.LineweightMm = lw;
 
-            var doc = Application.DocumentManager.MdiActiveDocument;
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc != null)
                 ClassManager.Instance.UpdateClass(cls, doc);
         }
@@ -99,7 +100,7 @@ namespace BricsLayerPlugin.UI
         {
             if (ClassListView.SelectedItem is not VwClass cls) return;
 
-            var doc = Application.DocumentManager.MdiActiveDocument;
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
             var ed = doc.Editor;
 
@@ -117,7 +118,7 @@ namespace BricsLayerPlugin.UI
 
         private void Refresh_Click(object sender, RoutedEventArgs e)
         {
-            var doc = Application.DocumentManager.MdiActiveDocument;
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc != null)
                 ClassManager.Instance.LoadFromDocument(doc);
         }
