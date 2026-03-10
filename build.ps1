@@ -38,21 +38,25 @@ Write-Host ""
 if (-not $BricsCADPath) {
     Write-Host "Hledam BricsCAD na disku..." -ForegroundColor Gray
 
-    # 1) Hledat v beznych sloskach
-    $searchPaths = @(
-        "C:\Program Files\Bricsys\BricsCAD V26",
-        "C:\Program Files\Bricsys\BricsCAD V25",
-        "C:\Program Files\Bricsys\BricsCAD V24",
-        "${env:ProgramFiles}\Bricsys\BricsCAD V26",
-        "${env:ProgramFiles}\Bricsys\BricsCAD V25",
-        "${env:ProgramFiles}\Bricsys\BricsCAD V24"
-    )
+    # 1) Hledat v beznych sloskach (vcetne jazykovych variant jako "V25 en_US", "V25 cs_CZ" apod.)
+    $bricsysDir = @(
+        "C:\Program Files\Bricsys",
+        "${env:ProgramFiles}\Bricsys"
+    ) | Select-Object -Unique
 
-    foreach ($path in $searchPaths) {
-        if (Test-Path "$path\BrxMgd.dll") {
-            $BricsCADPath = $path
-            break
+    foreach ($dir in $bricsysDir) {
+        if (Test-Path $dir) {
+            # Najdi vsechny slozky "BricsCAD V*" serazene od nejnovejsi verze
+            $candidates = Get-ChildItem -Path $dir -Directory -Filter "BricsCAD V*" -ErrorAction SilentlyContinue |
+                Sort-Object Name -Descending
+            foreach ($candidate in $candidates) {
+                if (Test-Path (Join-Path $candidate.FullName "BrxMgd.dll")) {
+                    $BricsCADPath = $candidate.FullName
+                    break
+                }
+            }
         }
+        if ($BricsCADPath) { break }
     }
 
     # 2) Pokud nenalezen, zkusit Windows registr
@@ -82,7 +86,7 @@ if (-not $BricsCADPath) {
         Write-Host "[!] BricsCAD nebyl nalezen automaticky." -ForegroundColor Yellow
         Write-Host ""
         Write-Host "  Zadejte UPLNOU cestu ke slozce BricsCAD," -ForegroundColor White
-        Write-Host "  napr.: C:\Program Files\Bricsys\BricsCAD V25" -ForegroundColor Gray
+        Write-Host "  napr.: C:\Program Files\Bricsys\BricsCAD V25 en_US" -ForegroundColor Gray
         Write-Host ""
         Write-Host "  (Slozka musi obsahovat soubor BrxMgd.dll)" -ForegroundColor Gray
         Write-Host ""
@@ -151,7 +155,8 @@ $buildArgs = @(
 )
 
 if ($BricsCADPath) {
-    $buildArgs += "/p:BricsCADPath=$BricsCADPath"
+    # Uvozovky jsou nutne pro cesty s mezerami (napr. "BricsCAD V25 en_US")
+    $buildArgs += "/p:BricsCADPath=`"$BricsCADPath`""
 }
 
 Write-Host ""
