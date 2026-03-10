@@ -21,7 +21,9 @@ param(
     [string]$BricsCADPath = ""
 )
 
-$ErrorActionPreference = "Stop"
+# DULEZITE: Nesmime pouzit "Stop" – jinak se pri chybe PowerShell ukonci
+# a CMD okno se zavre driv, nez uzivatel vidi chybu.
+$ErrorActionPreference = "Continue"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 Write-Host ""
@@ -34,7 +36,9 @@ Write-Host ""
 # 1. Detekce BricsCAD
 # ---------------------------------------------------------------
 if (-not $BricsCADPath) {
-    # Zkusit najít BricsCAD automaticky
+    Write-Host "Hledam BricsCAD na disku..." -ForegroundColor Gray
+
+    # 1) Hledat v beznych sloskach
     $searchPaths = @(
         "C:\Program Files\Bricsys\BricsCAD V26",
         "C:\Program Files\Bricsys\BricsCAD V25",
@@ -51,23 +55,59 @@ if (-not $BricsCADPath) {
         }
     }
 
+    # 2) Pokud nenalezen, zkusit Windows registr
     if (-not $BricsCADPath) {
+        $regPaths = @(
+            "HKLM:\SOFTWARE\Bricsys\BricsCAD",
+            "HKCU:\SOFTWARE\Bricsys\BricsCAD"
+        )
+        foreach ($regBase in $regPaths) {
+            if (Test-Path $regBase) {
+                $versions = Get-ChildItem $regBase -ErrorAction SilentlyContinue |
+                    Sort-Object Name -Descending
+                foreach ($ver in $versions) {
+                    $installPath = (Get-ItemProperty "$($ver.PSPath)" -Name "InstallPath" -ErrorAction SilentlyContinue).InstallPath
+                    if ($installPath -and (Test-Path "$installPath\BrxMgd.dll")) {
+                        $BricsCADPath = $installPath
+                        break
+                    }
+                }
+            }
+            if ($BricsCADPath) { break }
+        }
+    }
+
+    if (-not $BricsCADPath) {
+        Write-Host ""
         Write-Host "[!] BricsCAD nebyl nalezen automaticky." -ForegroundColor Yellow
-        Write-Host "    Zadejte cestu rucne, napr.:" -ForegroundColor Yellow
-        Write-Host '    .\build.ps1 -BricsCADPath "C:\Program Files\Bricsys\BricsCAD V25"' -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "  Zadejte UPLNOU cestu ke slozce BricsCAD," -ForegroundColor White
+        Write-Host "  napr.: C:\Program Files\Bricsys\BricsCAD V25" -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "  (Slozka musi obsahovat soubor BrxMgd.dll)" -ForegroundColor Gray
         Write-Host ""
 
-        $BricsCADPath = Read-Host "Cesta k BricsCAD (nebo Enter pro preskoceni)"
+        $BricsCADPath = Read-Host "Cesta k BricsCAD"
+
+        if ($BricsCADPath -and -not (Test-Path "$BricsCADPath\BrxMgd.dll")) {
+            Write-Host ""
+            Write-Host "[!] Soubor BrxMgd.dll nenalezen v: $BricsCADPath" -ForegroundColor Red
+            Write-Host "    Build pravdepodobne selze." -ForegroundColor Yellow
+            Write-Host ""
+        }
+
         if (-not $BricsCADPath) {
-            Write-Host "[!] Pokracuji bez BricsCAD referencí - build pravděpodobně selže." -ForegroundColor Red
+            Write-Host ""
+            Write-Host "[!] Bez BricsCAD build selze - zadna cesta nezadana." -ForegroundColor Red
+            Write-Host ""
+            Read-Host "Stisknete Enter pro zavreni"
+            exit 1
         }
     }
 }
 
-if ($BricsCADPath) {
-    Write-Host "[OK] BricsCAD nalezen: $BricsCADPath" -ForegroundColor Green
-    $env:BricsCADPath = $BricsCADPath
-}
+Write-Host "[OK] BricsCAD nalezen: $BricsCADPath" -ForegroundColor Green
+$env:BricsCADPath = $BricsCADPath
 
 # ---------------------------------------------------------------
 # 2. Kontrola .NET SDK
@@ -75,14 +115,22 @@ if ($BricsCADPath) {
 Write-Host ""
 Write-Host "[1/4] Kontroluji .NET SDK..." -ForegroundColor White
 
-try {
-    $dotnetVersion = & dotnet --version 2>&1
-    Write-Host "       .NET SDK: $dotnetVersion" -ForegroundColor Gray
-} catch {
-    Write-Host "[CHYBA] .NET SDK nenalezen!" -ForegroundColor Red
-    Write-Host "        Stahnete z: https://dotnet.microsoft.com/download" -ForegroundColor Yellow
+$dotnetExe = Get-Command dotnet -ErrorAction SilentlyContinue
+if (-not $dotnetExe) {
+    Write-Host ""
+    Write-Host "[CHYBA] .NET SDK neni nainstalovan!" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  Stahnete a nainstalujte .NET 8.0 SDK z:" -ForegroundColor Yellow
+    Write-Host "  https://dotnet.microsoft.com/download/dotnet/8.0" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  Po instalaci spustte build.cmd znovu." -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Stisknete Enter pro zavreni"
     exit 1
 }
+
+$dotnetVersion = & dotnet --version 2>&1
+Write-Host "       .NET SDK: $dotnetVersion" -ForegroundColor Gray
 
 # ---------------------------------------------------------------
 # 3. Sestavení pluginu
@@ -90,32 +138,56 @@ try {
 Write-Host ""
 Write-Host "[2/4] Sestavuji plugin ($Configuration)..." -ForegroundColor White
 
+if ($BricsCADPath) {
+    Write-Host "       BricsCAD: $BricsCADPath" -ForegroundColor Gray
+}
+
+$csprojPath = Join-Path $ScriptDir "BricsLayerPlugin.csproj"
 $buildArgs = @(
     "build",
-    "$ScriptDir\BricsLayerPlugin.csproj",
+    $csprojPath,
     "-c", $Configuration,
     "--nologo"
 )
 
 if ($BricsCADPath) {
-    $buildArgs += "/p:BricsCADPath=`"$BricsCADPath`""
+    $buildArgs += "/p:BricsCADPath=$BricsCADPath"
 }
 
+Write-Host ""
 & dotnet @buildArgs
+$buildResult = $LASTEXITCODE
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[CHYBA] Sestaveni selhalo!" -ForegroundColor Red
+if ($buildResult -ne 0) {
+    Write-Host ""
+    Write-Host "[CHYBA] Sestaveni selhalo! (exit code: $buildResult)" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  Mozne priciny:" -ForegroundColor Yellow
+    Write-Host "  1. BricsCAD neni nainstalovan nebo nebyl nalezen" -ForegroundColor Yellow
+    Write-Host "     -> nainstalujte BricsCAD V25+ (Pro nebo Platinum)" -ForegroundColor Gray
+    Write-Host "     -> nebo zadejte cestu rucne pri pristim spusteni" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  2. Chybi BricsCAD DLL reference (BrxMgd.dll, TD_Mgd.dll)" -ForegroundColor Yellow
+    Write-Host "     -> ověřte, ze BricsCAD je nainstalovan v:" -ForegroundColor Gray
+    Write-Host "        C:\Program Files\Bricsys\BricsCAD V25\" -ForegroundColor Gray
+    Write-Host ""
+    Read-Host "Stisknete Enter pro zavreni"
     exit 1
 }
 
-$outputDir = "$ScriptDir\bin\$Configuration\net8.0-windows"
-$dllPath = "$outputDir\BricsLayerPlugin.dll"
+$outputDir = Join-Path $ScriptDir "bin\$Configuration\net8.0-windows"
+$dllPath = Join-Path $outputDir "BricsLayerPlugin.dll"
 
 if (Test-Path $dllPath) {
     $fileSize = (Get-Item $dllPath).Length / 1KB
-    Write-Host "       Vystup: $dllPath ($([math]::Round($fileSize, 1)) KB)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "       Vystup: $dllPath" -ForegroundColor Gray
+    Write-Host "       Velikost: $([math]::Round($fileSize, 1)) KB" -ForegroundColor Gray
 } else {
+    Write-Host ""
     Write-Host "[CHYBA] DLL nebyl vytvoren!" -ForegroundColor Red
+    Write-Host "       Ocekavany soubor: $dllPath" -ForegroundColor Gray
+    Read-Host "Stisknete Enter pro zavreni"
     exit 1
 }
 

@@ -1,13 +1,9 @@
 @echo off
+title BricsLayerPlugin - Build
 REM =============================================================
-REM BricsLayerPlugin – Jednoduché sestavení a vytvoření instalátoru
+REM BricsLayerPlugin – Sestaveni a vytvoreni instalatoru
+REM Staci dvakrat kliknout na tento soubor.
 REM =============================================================
-REM
-REM DŮLEŽITÉ: Tento soubor musí být v kořenové složce projektu
-REM           (vedle build.ps1 a BricsLayerPlugin.csproj)
-REM
-REM Stačí dvakrát kliknout na tento soubor!
-REM
 
 echo.
 echo ============================================
@@ -15,51 +11,78 @@ echo  BricsLayerPlugin - Build
 echo ============================================
 echo.
 
-REM Přepnout do složky kde leží tento .cmd soubor
+REM Prepnout do slozky kde lezi tento .cmd soubor
+echo Pracovni slozka: %~dp0
 cd /d "%~dp0"
+echo.
 
-REM Kontrola – je build.ps1 ve stejné složce?
-if not exist "%~dp0build.ps1" (
-    echo [CHYBA] Soubor build.ps1 nebyl nalezen!
+REM --- Kontroly souboru ---
+echo Kontroluji soubory...
+
+if not exist "build.ps1" (
     echo.
-    echo Tento soubor (build.cmd) musi byt ve slozce projektu
-    echo vedle souboru build.ps1 a BricsLayerPlugin.csproj.
+    echo [CHYBA] Soubor build.ps1 nebyl nalezen ve slozce:
+    echo         %~dp0
     echo.
-    echo Aktualni slozka: %~dp0
+    echo Ujistete se, ze jste stahli CELY projekt.
     echo.
-    echo Ujistete se, ze jste stahli CELY projekt, ne jen tento soubor.
-    echo.
-    pause
-    exit /b 1
+    goto :konec
 )
+echo   build.ps1              OK
 
-REM Kontrola – je tady i .csproj?
-if not exist "%~dp0BricsLayerPlugin.csproj" (
-    echo [CHYBA] BricsLayerPlugin.csproj nebyl nalezen!
+if not exist "BricsLayerPlugin.csproj" (
     echo.
-    echo Tento soubor musi byt v korenove slozce projektu.
-    echo Aktualni slozka: %~dp0
+    echo [CHYBA] BricsLayerPlugin.csproj nebyl nalezen ve slozce:
+    echo         %~dp0
     echo.
-    pause
-    exit /b 1
+    goto :konec
 )
+echo   BricsLayerPlugin.csproj OK
+echo.
 
-REM Detekce PowerShell (pwsh = PowerShell 7+, powershell = Windows PowerShell 5)
-where pwsh >nul 2>nul
-if %errorlevel% equ 0 (
-    echo Pouzivam PowerShell 7+
-    pwsh -NoProfile -ExecutionPolicy Bypass -File "%~dp0build.ps1" %*
-) else (
-    echo Pouzivam Windows PowerShell
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0build.ps1" %*
-)
-
+REM --- Kontrola dotnet ---
+echo Kontroluji .NET SDK...
+where dotnet >nul 2>nul
 if errorlevel 1 (
     echo.
-    echo [CHYBA] Build selhal!
+    echo [CHYBA] .NET SDK neni nainstalovan!
     echo.
-    pause
-    exit /b 1
+    echo Stahnete a nainstalujte .NET 8.0 SDK z:
+    echo   https://dotnet.microsoft.com/download/dotnet/8.0
+    echo.
+    echo Po instalaci spustte tento soubor znovu.
+    echo.
+    goto :konec
+)
+for /f "tokens=*" %%v in ('dotnet --version 2^>nul') do echo   .NET SDK verze: %%v
+echo.
+
+REM --- Spusteni PowerShell buildu ---
+echo Spoustim build skript...
+echo.
+
+REM Detekce PowerShell verze
+where pwsh >nul 2>nul
+if %errorlevel% equ 0 (
+    echo Pouzivam: PowerShell 7+
+    echo ---
+    pwsh -NoProfile -ExecutionPolicy Bypass -File "build.ps1" %*
+) else (
+    echo Pouzivam: Windows PowerShell
+    echo ---
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "build.ps1" %*
 )
 
-pause
+echo.
+if errorlevel 1 (
+    echo [CHYBA] Build skript skoncil s chybou.
+) else (
+    echo [OK] Build skript dokoncen.
+)
+
+:konec
+echo.
+echo ============================================
+echo  Stisknete libovolnou klavesu pro zavreni.
+echo ============================================
+pause >nul
