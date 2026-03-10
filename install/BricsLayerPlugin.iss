@@ -196,7 +196,7 @@ function GetBricsCADVersion(Param: String): String;
 var
   Selected: String;
 begin
-  Selected := BricsCADVersionPage.Values[BricsCADVersionPage.SelectedValueIndex];
+  Selected := BricsCADVersionPage.CheckListBox.ItemCaption[BricsCADVersionPage.SelectedValueIndex];
   // Extrahovat verzi (např. "BricsCAD V25" -> "V25")
   if Pos('V', Selected) > 0 then
     Result := Copy(Selected, Pos('V', Selected), Length(Selected))
