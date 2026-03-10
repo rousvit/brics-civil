@@ -1,5 +1,5 @@
 using Bricscad.ApplicationServices;
-using Bricscad.Runtime;
+using Teigha.Runtime;
 using BricsLayerPlugin.Managers;
 
 [assembly: ExtensionApplication(typeof(BricsLayerPlugin.PluginApp))]
