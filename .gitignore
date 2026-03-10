@@ -9,3 +9,4 @@ obj/
 dist/
 install/deps/
 Directory.Build.props
+lib/

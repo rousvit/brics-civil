@@ -10,23 +10,21 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <!-- Set BricsCAD install path; override via environment or Directory.Build.props -->
-    <BricsCADPath Condition="'$(BricsCADPath)' == ''">C:\Program Files\Bricsys\BricsCAD V25</BricsCADPath>
-  </PropertyGroup>
-
   <ItemGroup>
-    <!-- BricsCAD .NET API references -->
+    <!--
+      BricsCAD .NET API references - nacitane z lokalni slozky lib/
+      Build skript (build.ps1) automaticky zkopiruje DLL z instalace BricsCAD.
+    -->
     <Reference Include="BrxMgd">
-      <HintPath>$(BricsCADPath)\BrxMgd.dll</HintPath>
+      <HintPath>lib\BrxMgd.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="TD_Mgd">
-      <HintPath>$(BricsCADPath)\TD_Mgd.dll</HintPath>
+      <HintPath>lib\TD_Mgd.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="TD_MgdBrep">
-      <HintPath>$(BricsCADPath)\TD_MgdBrep.dll</HintPath>
+      <HintPath>lib\TD_MgdBrep.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

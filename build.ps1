@@ -148,40 +148,42 @@ if ($BricsCADPath) {
 
 $csprojPath = Join-Path $ScriptDir "BricsLayerPlugin.csproj"
 
-# Diagnostika – ověřit, ze DLL existují na zadane ceste
-if ($BricsCADPath) {
-    $testDll = Join-Path $BricsCADPath "BrxMgd.dll"
-    if (Test-Path $testDll) {
-        Write-Host "       BrxMgd.dll: nalezen ($testDll)" -ForegroundColor Gray
+# Zkopirovat BricsCAD DLL do lokalni slozky lib/ v projektu.
+# Timto se obejdou vsechny problemy s cestami obsahujicimi mezery.
+$libDir = Join-Path $ScriptDir "lib"
+if (-not (Test-Path $libDir)) {
+    New-Item -ItemType Directory -Path $libDir | Out-Null
+}
+
+$requiredDlls = @("BrxMgd.dll", "TD_Mgd.dll", "TD_MgdBrep.dll")
+$allFound = $true
+
+foreach ($dll in $requiredDlls) {
+    $srcPath = Join-Path $BricsCADPath $dll
+    $dstPath = Join-Path $libDir $dll
+
+    if (Test-Path $srcPath) {
+        Copy-Item -Path $srcPath -Destination $dstPath -Force
+        $fileSize = [math]::Round((Get-Item $dstPath).Length / 1KB, 0)
+        Write-Host "       $dll -> lib/ ($fileSize KB)" -ForegroundColor Gray
     } else {
-        Write-Host "       [!] BrxMgd.dll NENALEZEN v: $BricsCADPath" -ForegroundColor Red
+        Write-Host "       [!] $dll NENALEZEN v: $BricsCADPath" -ForegroundColor Red
+        $allFound = $false
     }
 }
 
-# RESENI: Predavani cest s mezerami pres /p: je v PowerShell nespolehlivy.
-# Zapiseme cestu do Directory.Build.props – MSBuild ho nacte automaticky.
-if ($BricsCADPath) {
-    $propsFile = Join-Path $ScriptDir "Directory.Build.props"
-    $propsContent = @"
-<Project>
-  <PropertyGroup>
-    <BricsCADPath>$BricsCADPath</BricsCADPath>
-  </PropertyGroup>
-</Project>
-"@
-    Set-Content -Path $propsFile -Value $propsContent -Encoding UTF8
-    Write-Host "       Directory.Build.props: vytvoren s cestou" -ForegroundColor Gray
+if (-not $allFound) {
+    Write-Host ""
+    Write-Host "[CHYBA] Nektere BricsCAD DLL nebyly nalezeny!" -ForegroundColor Red
+    Write-Host "       Zkontrolujte instalaci BricsCAD." -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Stisknete Enter pro zavreni"
+    exit 1
 }
 
 Write-Host ""
 & dotnet build $csprojPath -c $Configuration --nologo
 $buildResult = $LASTEXITCODE
-
-# Smazat docasny Directory.Build.props
-$propsFile = Join-Path $ScriptDir "Directory.Build.props"
-if (Test-Path $propsFile) {
-    Remove-Item $propsFile -Force -ErrorAction SilentlyContinue
-}
 
 if ($buildResult -ne 0) {
     Write-Host ""
