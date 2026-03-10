@@ -147,20 +147,27 @@ if ($BricsCADPath) {
 }
 
 $csprojPath = Join-Path $ScriptDir "BricsLayerPlugin.csproj"
-$buildArgs = @(
-    "build",
-    $csprojPath,
-    "-c", $Configuration,
-    "--nologo"
-)
 
+# Diagnostika – ověřit, ze DLL existují na zadane ceste
 if ($BricsCADPath) {
-    # Uvozovky jsou nutne pro cesty s mezerami (napr. "BricsCAD V25 en_US")
-    $buildArgs += "/p:BricsCADPath=`"$BricsCADPath`""
+    $testDll = Join-Path $BricsCADPath "BrxMgd.dll"
+    if (Test-Path $testDll) {
+        Write-Host "       BrxMgd.dll: nalezen ($testDll)" -ForegroundColor Gray
+    } else {
+        Write-Host "       [!] BrxMgd.dll NENALEZEN v: $BricsCADPath" -ForegroundColor Red
+    }
 }
 
+# DULEZITE: Nepouzivame splatting (@args) s /p: vlastnostmi,
+# protoze PowerShell spatne predava cesty s mezerami.
+# Misto toho voláme dotnet primo s jednotlivymi argumenty.
 Write-Host ""
-& dotnet @buildArgs
+if ($BricsCADPath) {
+    Write-Host "       dotnet build ... /p:BricsCADPath=$BricsCADPath" -ForegroundColor DarkGray
+    & dotnet build $csprojPath -c $Configuration --nologo "/p:BricsCADPath=$BricsCADPath"
+} else {
+    & dotnet build $csprojPath -c $Configuration --nologo
+}
 $buildResult = $LASTEXITCODE
 
 if ($buildResult -ne 0) {
