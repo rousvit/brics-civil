@@ -53,13 +53,27 @@ namespace BricsLayerPlugin.Managers
                 {
                     Name = ltr.Name,
                     BricsLayerName = ltr.Name,
-                    ColorIndex = ltr.Color.ColorIndex,
                     LinetypeName = GetLinetypeName(ltr.LinetypeObjectId, tr),
                     LineweightMm = LineWeightToMm(ltr.LineWeight),
                     Transparency = GetTransparencyPercent(ltr.Transparency),
                     Visibility = visibility,
                     IsActive = id == activeLayerId
                 };
+
+                // Načíst barvu - ACI nebo True Color
+                var layerColor = ltr.Color;
+                if (layerColor.IsByAci)
+                {
+                    cls.ColorIndex = layerColor.ColorIndex;
+                    cls.IsTrueColor = false;
+                }
+                else
+                {
+                    cls.IsTrueColor = true;
+                    cls.ColorRed = layerColor.Red;
+                    cls.ColorGreen = layerColor.Green;
+                    cls.ColorBlue = layerColor.Blue;
+                }
                 _classes.Add(cls);
             }
             tr.Commit();
@@ -72,7 +86,8 @@ namespace BricsLayerPlugin.Managers
         /// </summary>
         public VwClass CreateClass(string name, Document doc,
             int colorIndex = 7, string linetype = "Continuous",
-            double lineweightMm = 0.25, int transparency = 0)
+            double lineweightMm = 0.25, int transparency = 0,
+            bool isTrueColor = false, byte colorR = 0, byte colorG = 0, byte colorB = 0)
         {
             if (_classes.Any(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidOperationException($"Třída '{name}' již existuje.");
@@ -85,7 +100,12 @@ namespace BricsLayerPlugin.Managers
                 throw new InvalidOperationException($"BricsCAD vrstva '{name}' již existuje.");
 
             var ltr = new LayerTableRecord { Name = name };
-            ltr.Color = Color.FromColorIndex(ColorMethod.ByAci, (short)Math.Clamp(colorIndex, 1, 255));
+
+            if (isTrueColor)
+                ltr.Color = Color.FromRgb(colorR, colorG, colorB);
+            else
+                ltr.Color = Color.FromColorIndex(ColorMethod.ByAci, (short)Math.Clamp(colorIndex, 1, 255));
+
             ltr.LineWeight = MmToLineWeight(lineweightMm);
 
             // Linetype
@@ -109,6 +129,10 @@ namespace BricsLayerPlugin.Managers
                 Name = name,
                 BricsLayerName = name,
                 ColorIndex = colorIndex,
+                IsTrueColor = isTrueColor,
+                ColorRed = colorR,
+                ColorGreen = colorG,
+                ColorBlue = colorB,
                 LinetypeName = linetype,
                 LineweightMm = lineweightMm,
                 Transparency = transparency,
@@ -185,7 +209,11 @@ namespace BricsLayerPlugin.Managers
 
             var ltr = (LayerTableRecord)tr.GetObject(lt[cls.BricsLayerName], OpenMode.ForWrite);
 
-            ltr.Color = Color.FromColorIndex(ColorMethod.ByAci, (short)Math.Clamp(cls.ColorIndex, 1, 255));
+            if (cls.IsTrueColor)
+                ltr.Color = Color.FromRgb(cls.ColorRed, cls.ColorGreen, cls.ColorBlue);
+            else
+                ltr.Color = Color.FromColorIndex(ColorMethod.ByAci, (short)Math.Clamp(cls.ColorIndex, 1, 255));
+
             ltr.LineWeight = MmToLineWeight(cls.LineweightMm);
 
             var ltt = (LinetypeTable)tr.GetObject(db.LinetypeTableId, OpenMode.ForRead);

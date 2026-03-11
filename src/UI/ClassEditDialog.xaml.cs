@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using Teigha.Colors;
+using BcadColor = Teigha.Colors.Color;
 
 namespace BricsLayerPlugin.UI
 {
@@ -12,6 +13,10 @@ namespace BricsLayerPlugin.UI
     {
         public string ClassName { get; private set; } = string.Empty;
         public int ColorIndex { get; private set; } = 7;
+        public bool IsTrueColor { get; private set; }
+        public byte ColorRed { get; private set; }
+        public byte ColorGreen { get; private set; }
+        public byte ColorBlue { get; private set; }
         public string LinetypeName { get; private set; } = "Continuous";
         public double LineweightMm { get; private set; } = 0.25;
         public int Transparency { get; private set; }
@@ -23,7 +28,7 @@ namespace BricsLayerPlugin.UI
             1.40, 1.58, 2.00, 2.11
         };
 
-        private static readonly (int Index, string Label, Color Color)[] QuickColors =
+        private static readonly (int Index, string Label, System.Windows.Media.Color Color)[] QuickColors =
         {
             (1, "1", Colors.Red),
             (2, "2", Colors.Yellow),
@@ -34,17 +39,12 @@ namespace BricsLayerPlugin.UI
             (7, "7", Colors.White),
             (8, "8", Colors.Gray),
             (9, "9", Colors.LightGray),
-            (30, "30", Color.FromRgb(255, 127, 0)),
-            (40, "40", Color.FromRgb(255, 191, 0)),
-            (80, "80", Color.FromRgb(0, 127, 63)),
-            (140, "140", Color.FromRgb(0, 63, 255)),
-            (200, "200", Color.FromRgb(191, 0, 255)),
-            (250, "250", Color.FromRgb(50, 50, 50)),
         };
 
         public ClassEditDialog(string name, int colorIndex, string linetype,
             double lineweight, int transparency, List<string> availableLinetypes,
-            bool isNew = false)
+            bool isNew = false, bool isTrueColor = false,
+            byte colorR = 0, byte colorG = 0, byte colorB = 0)
         {
             InitializeComponent();
             Title = isNew ? "Nová třída" : $"Upravit třídu - {name}";
@@ -60,7 +60,7 @@ namespace BricsLayerPlugin.UI
                     Width = 26, Height = 22,
                     Margin = new Thickness(1),
                     Background = new SolidColorBrush(color),
-                    BorderBrush = new SolidColorBrush(Color.FromRgb(85, 85, 85)),
+                    BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromRgb(85, 85, 85)),
                     Tag = idx,
                     ToolTip = $"ACI {idx}",
                     Cursor = System.Windows.Input.Cursors.Hand
@@ -88,10 +88,18 @@ namespace BricsLayerPlugin.UI
             TransparencyLabel.Text = $"{transparency} %";
 
             // Set initial color
-            SetSelectedColor(colorIndex);
+            IsTrueColor = isTrueColor;
+            ColorRed = colorR;
+            ColorGreen = colorG;
+            ColorBlue = colorB;
+            ColorIndex = colorIndex;
+
+            if (isTrueColor)
+                SetTrueColor(colorR, colorG, colorB);
+            else
+                SetAciColor(colorIndex);
 
             ClassName = name;
-            ColorIndex = colorIndex;
             LinetypeName = linetype;
             LineweightMm = lineweight;
             Transparency = transparency;
@@ -100,11 +108,49 @@ namespace BricsLayerPlugin.UI
                 NameBox.Focus();
         }
 
+        /// <summary>
+        /// Otevře nativní BricsCAD ColorDialog (Index Color, True Color, Color Books).
+        /// </summary>
+        private void OpenColorDialog_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dlg = new Bricscad.Windows.ColorDialog();
+
+                // Nastavit výchozí barvu
+                if (IsTrueColor)
+                    dlg.Color = BcadColor.FromRgb(ColorRed, ColorGreen, ColorBlue);
+                else
+                    dlg.Color = BcadColor.FromColorIndex(ColorMethod.ByAci, (short)ColorIndex);
+
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    var selected = dlg.Color;
+
+                    if (selected.IsByAci)
+                    {
+                        SetAciColor(selected.ColorIndex);
+                    }
+                    else
+                    {
+                        // True Color nebo Color Book -> RGB
+                        SetTrueColor(selected.Red, selected.Green, selected.Blue);
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(
+                    $"Nativní dialog barev není dostupný:\n{ex.Message}\n\nPoužijte rychlý výběr ACI nebo zadejte číslo.",
+                    "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
         private void ColorButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is int idx)
             {
-                SetSelectedColor(idx);
+                SetAciColor(idx);
                 CustomColorBox.Text = idx.ToString();
             }
         }
@@ -112,25 +158,47 @@ namespace BricsLayerPlugin.UI
         private void CustomColorBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (int.TryParse(CustomColorBox.Text, out int idx) && idx >= 1 && idx <= 255)
-                SetSelectedColor(idx);
+                SetAciColor(idx);
         }
 
-        private void SetSelectedColor(int aci)
+        private void SetAciColor(int aci)
         {
+            IsTrueColor = false;
             ColorIndex = Math.Clamp(aci, 1, 255);
             var color = AciToApproxColor(ColorIndex);
             ColorPreview.Fill = new SolidColorBrush(color);
             ColorIndexLabel.Text = $"ACI {ColorIndex}";
+            TrueColorInfo.Visibility = Visibility.Collapsed;
 
-            // Highlight the matching quick button
+            HighlightQuickButton(ColorIndex);
+        }
+
+        private void SetTrueColor(byte r, byte g, byte b)
+        {
+            IsTrueColor = true;
+            ColorRed = r;
+            ColorGreen = g;
+            ColorBlue = b;
+            var color = System.Windows.Media.Color.FromRgb(r, g, b);
+            ColorPreview.Fill = new SolidColorBrush(color);
+            ColorIndexLabel.Text = "True Color";
+            TrueColorInfo.Text = $"RGB({r}, {g}, {b})";
+            TrueColorInfo.Visibility = Visibility.Visible;
+
+            HighlightQuickButton(-1); // deselect all
+        }
+
+        private void HighlightQuickButton(int selectedAci)
+        {
             foreach (var child in ColorButtonPanel.Children)
             {
                 if (child is Button btn)
                 {
-                    bool selected = btn.Tag is int t && t == ColorIndex;
+                    bool selected = btn.Tag is int t && t == selectedAci;
                     btn.BorderThickness = new Thickness(selected ? 2 : 1);
                     btn.BorderBrush = new SolidColorBrush(selected
-                        ? Color.FromRgb(0, 122, 204) : Color.FromRgb(85, 85, 85));
+                        ? System.Windows.Media.Color.FromRgb(0, 122, 204)
+                        : System.Windows.Media.Color.FromRgb(85, 85, 85));
                 }
             }
         }
@@ -154,7 +222,6 @@ namespace BricsLayerPlugin.UI
             LinetypeName = LinetypeCombo.SelectedItem?.ToString() ?? "Continuous";
             Transparency = (int)TransparencySlider.Value;
 
-            // Parse lineweight from "0.25 mm" format
             if (LineweightCombo.SelectedIndex >= 0 && LineweightCombo.SelectedIndex < StandardLineweights.Length)
                 LineweightMm = StandardLineweights[LineweightCombo.SelectedIndex];
 
@@ -182,7 +249,7 @@ namespace BricsLayerPlugin.UI
             return idx;
         }
 
-        internal static Color AciToApproxColor(int aci) => aci switch
+        internal static System.Windows.Media.Color AciToApproxColor(int aci) => aci switch
         {
             1 => Colors.Red,
             2 => Colors.Yellow,
@@ -193,33 +260,23 @@ namespace BricsLayerPlugin.UI
             7 => Colors.White,
             8 => Colors.Gray,
             9 => Colors.LightGray,
-            >= 10 and <= 19 => Color.FromRgb(255, (byte)(aci * 12), 0),
-            >= 20 and <= 29 => Color.FromRgb(255, (byte)(127 + aci * 4), 0),
-            >= 30 and <= 39 => Color.FromRgb(255, (byte)(170 + aci * 2), 0),
-            >= 40 and <= 49 => Color.FromRgb(255, 255, (byte)(aci * 5)),
-            >= 50 and <= 59 => Color.FromRgb((byte)(255 - aci * 3), 255, 0),
-            >= 60 and <= 69 => Color.FromRgb((byte)(127 - aci), 255, 0),
-            >= 70 and <= 79 => Color.FromRgb(0, 255, (byte)(aci * 3)),
-            >= 80 and <= 89 => Color.FromRgb(0, 255, (byte)(127 + aci * 2)),
-            >= 90 and <= 99 => Color.FromRgb(0, 255, 255),
-            >= 100 and <= 109 => Color.FromRgb(0, (byte)(255 - aci * 2), 255),
-            >= 110 and <= 119 => Color.FromRgb(0, (byte)(170 - aci), 255),
-            >= 120 and <= 129 => Color.FromRgb(0, (byte)(100 - aci / 2), 255),
-            >= 130 and <= 139 => Color.FromRgb(0, 0, 255),
-            >= 140 and <= 149 => Color.FromRgb((byte)(aci - 60), 0, 255),
-            >= 150 and <= 179 => Color.FromRgb((byte)(127 + aci / 3), 0, 255),
-            >= 180 and <= 199 => Color.FromRgb(255, 0, (byte)(255 - aci)),
-            >= 200 and <= 209 => Color.FromRgb(255, 0, 255),
-            >= 210 and <= 229 => Color.FromRgb(255, 0, (byte)(200 - aci / 2)),
-            >= 230 and <= 239 => Color.FromRgb((byte)(255 - aci / 3), (byte)(aci / 3), (byte)(aci / 3)),
-            >= 240 and <= 249 => Color.FromRgb((byte)(200 - aci / 4), (byte)(200 - aci / 4), (byte)(200 - aci / 4)),
-            250 => Color.FromRgb(50, 50, 50),
-            251 => Color.FromRgb(80, 80, 80),
-            252 => Color.FromRgb(105, 105, 105),
-            253 => Color.FromRgb(130, 130, 130),
-            254 => Color.FromRgb(190, 190, 190),
+            250 => System.Windows.Media.Color.FromRgb(50, 50, 50),
+            251 => System.Windows.Media.Color.FromRgb(80, 80, 80),
+            252 => System.Windows.Media.Color.FromRgb(105, 105, 105),
+            253 => System.Windows.Media.Color.FromRgb(130, 130, 130),
+            254 => System.Windows.Media.Color.FromRgb(190, 190, 190),
             255 => Colors.White,
             _ => Colors.White
         };
+
+        /// <summary>
+        /// Vrací barvu pro UI preview (WPF Color) z VwClass.
+        /// </summary>
+        internal static System.Windows.Media.Color GetDisplayColor(Models.VwClass cls)
+        {
+            if (cls.IsTrueColor)
+                return System.Windows.Media.Color.FromRgb(cls.ColorRed, cls.ColorGreen, cls.ColorBlue);
+            return AciToApproxColor(cls.ColorIndex);
+        }
     }
 }

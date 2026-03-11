@@ -19,19 +19,29 @@ namespace BricsLayerPlugin
         public void Initialize()
         {
             var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-            ed?.WriteMessage("\n=== BricsLayerPlugin (Vectorworks styl) v2.0 ===");
+            ed?.WriteMessage("\n=== BricsLayerPlugin (Vectorworks styl) v3.0 ===");
             ed?.WriteMessage("\nTřídy (= BricsCAD vrstvy): VW_CLASSES, VW_CLASS_NEW, VW_CLASS_ACTIVE, VW_CLASS_LIST");
             ed?.WriteMessage("\nHladiny (organizace):       VW_LEVELS, VW_LEVEL_NEW, VW_LEVEL_ASSIGN, VW_LEVEL_STATE");
             ed?.WriteMessage("\n                            VW_LEVEL_UP, VW_LEVEL_DOWN, VW_LEVEL_SYNC, VW_LEVEL_INFO, VW_LEVEL_LIST");
             ed?.WriteMessage("\nPanel:                      VW_PANEL (otevřít/zavřít)");
             ed?.WriteMessage("\nTřída = vzhled objektů (barva, čára, tloušťka, průhlednost)");
             ed?.WriteMessage("\nHladina = organizace objektů (pořadí zobrazení, viditelnost skupiny)");
+            ed?.WriteMessage("\n  -> Nové objekty se automaticky přiřadí do aktivní hladiny!");
 
             Application.DocumentManager.DocumentActivated += OnDocumentActivated;
+
+            // Inicializace pro aktuální dokument
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc != null)
+            {
+                ClassManager.Instance.LoadFromDocument(doc);
+                LevelManager.Instance.LoadFromDocument(doc);
+            }
         }
 
         public void Terminate()
         {
+            LevelManager.Instance.DisableAutoAssign();
             Application.DocumentManager.DocumentActivated -= OnDocumentActivated;
         }
 

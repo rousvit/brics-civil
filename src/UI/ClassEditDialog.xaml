@@ -4,7 +4,7 @@
         Title="Upravit třídu" SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterScreen"
         Background="#2D2D30" ResizeMode="NoResize"
-        MinWidth="440">
+        MinWidth="460">
 
     <Grid Margin="15">
         <Grid.ColumnDefinitions>
@@ -34,29 +34,36 @@
                  Padding="5,3" FontSize="13" CaretBrush="White"/>
 
         <!-- Color - label -->
-        <TextBlock Grid.Row="2" Grid.Column="0" Text="Barva (ACI):" Foreground="#CCC"
-                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="Barva:" Foreground="#CCC"
+                   VerticalAlignment="Top" Margin="0,4,10,0"/>
 
-        <!-- Color - quick buttons + custom -->
+        <!-- Color - BricsCAD dialog button + quick buttons + custom -->
         <StackPanel Grid.Row="2" Grid.Column="1">
+            <!-- Hlavní tlačítko pro BricsCAD nativní dialog -->
+            <Button x:Name="OpenColorDialogBtn" Content="Vybrat barvu (BricsCAD)..."
+                    Click="OpenColorDialog_Click"
+                    Background="#007ACC" Foreground="White" Padding="8,5" Margin="0,0,0,6"
+                    Cursor="Hand" FontSize="12" HorizontalAlignment="Left"/>
+
+            <!-- Rychlý výběr ACI -->
+            <TextBlock Text="Rychlý výběr ACI:" Foreground="#888" FontSize="10" Margin="0,0,0,3"/>
             <WrapPanel x:Name="ColorButtonPanel" Margin="0,0,0,5"/>
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Vlastní:" Foreground="#999" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBlock Text="ACI číslo:" Foreground="#999" VerticalAlignment="Center" Margin="0,0,5,0"/>
                 <TextBox x:Name="CustomColorBox" Width="50"
                          Background="#3E3E42" Foreground="White" BorderBrush="#555"
                          Padding="3,2" TextChanged="CustomColorBox_TextChanged" CaretBrush="White"/>
-                <Rectangle x:Name="ColorPreview" Width="24" Height="20" Margin="10,0,0,0"
+                <Rectangle x:Name="ColorPreview" Width="30" Height="22" Margin="10,0,0,0"
                            Stroke="#555" StrokeThickness="1"/>
                 <TextBlock x:Name="ColorIndexLabel" Foreground="#AAA" VerticalAlignment="Center"
-                           Margin="8,0,0,0" FontSize="11"/>
+                           Margin="8,0,0,0" FontSize="12"/>
             </StackPanel>
         </StackPanel>
 
-        <!-- Color preview row -->
-        <Border Grid.Row="3" Grid.Column="1" Margin="0,5,0,0" Padding="3"
-                Background="#252526" BorderBrush="#444" BorderThickness="1" CornerRadius="2">
-            <StackPanel x:Name="ColorPreviewPanel" Orientation="Horizontal" Height="20"/>
-        </Border>
+        <!-- Spacer row for color info -->
+        <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,3,0,0">
+            <TextBlock x:Name="TrueColorInfo" Foreground="#4EC9B0" FontSize="11" Visibility="Collapsed"/>
+        </StackPanel>
 
         <!-- Linetype -->
         <TextBlock Grid.Row="5" Grid.Column="0" Text="Typ čáry:" Foreground="#CCC"

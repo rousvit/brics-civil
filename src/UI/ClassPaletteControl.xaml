@@ -54,8 +54,6 @@
                     ToolTip="Smazat třídu" Width="32"/>
             <Button Content="&#x270E;" Style="{StaticResource DarkButton}" Click="EditClass_Click"
                     ToolTip="Upravit vlastnosti" Width="32"/>
-            <Button Content="&#x2713;" Style="{StaticResource DarkButton}" Click="SetActive_Click"
-                    ToolTip="Nastavit jako aktivní" Width="32"/>
             <Button Content="&#x27F3;" Style="{StaticResource DarkButton}" Click="Refresh_Click"
                     ToolTip="Obnovit" Width="32"/>
         </StackPanel>
@@ -93,6 +91,31 @@
                   MouseDoubleClick="ClassListView_DoubleClick">
             <ListView.View>
                 <GridView>
+                    <!-- Active indicator column (► button) -->
+                    <GridViewColumn Header="" Width="30">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Click="ActivateClass_Click"
+                                        Background="Transparent" BorderThickness="0"
+                                        Cursor="Hand" Width="24" Height="20" Padding="0"
+                                        ToolTip="Nastavit jako aktivní třídu">
+                                    <TextBlock Text="&#x25BA;" FontSize="11" HorizontalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="#555"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                        <Setter Property="Foreground" Value="#4EC9B0"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Button>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+
                     <GridViewColumn Header="Viditelnost" Width="80">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
@@ -113,7 +136,7 @@
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
                     <GridViewColumn Header="Název" Width="120" DisplayMemberBinding="{Binding Name}"/>
-                    <GridViewColumn Header="Barva" Width="45" DisplayMemberBinding="{Binding ColorIndex}"/>
+                    <GridViewColumn Header="Barva" Width="60" DisplayMemberBinding="{Binding ColorDisplay}"/>
                     <GridViewColumn Header="Čára" Width="80" DisplayMemberBinding="{Binding LinetypeName}"/>
                     <GridViewColumn Header="Tl." Width="40" DisplayMemberBinding="{Binding LineweightMm}"/>
                 </GridView>

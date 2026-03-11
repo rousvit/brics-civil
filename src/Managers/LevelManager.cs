@@ -30,8 +30,130 @@ namespace BricsLayerPlugin.Managers
 
         private const string XDataAppName = "VWLEVEL";
 
+        // Auto-assign tracking
+        private Document? _trackedDoc;
+        private Database? _trackedDb;
+        private readonly List<ObjectId> _pendingNewEntities = new();
+        private bool _autoAssignEnabled;
+
         /// <summary>Vrátí aktivní hladinu.</summary>
         public VwLevel? ActiveLevel => _levels.FirstOrDefault(l => l.IsActive);
+
+        /// <summary>
+        /// Zapne automatické přiřazování nových entit do aktivní hladiny.
+        /// Sleduje Database.ObjectAppended a přiřadí XData po dokončení příkazu.
+        /// </summary>
+        public void EnableAutoAssign(Document doc)
+        {
+            DisableAutoAssign();
+
+            _trackedDoc = doc;
+            _trackedDb = doc.Database;
+            _autoAssignEnabled = true;
+
+            _trackedDb.ObjectAppended += OnObjectAppended;
+            _trackedDoc.CommandEnded += OnCommandEnded;
+        }
+
+        /// <summary>
+        /// Vypne automatické přiřazování.
+        /// </summary>
+        public void DisableAutoAssign()
+        {
+            if (_trackedDb != null)
+            {
+                _trackedDb.ObjectAppended -= OnObjectAppended;
+                _trackedDb = null;
+            }
+            if (_trackedDoc != null)
+            {
+                _trackedDoc.CommandEnded -= OnCommandEnded;
+                _trackedDoc = null;
+            }
+            _pendingNewEntities.Clear();
+            _autoAssignEnabled = false;
+        }
+
+        /// <summary>
+        /// Při přidání nového objektu do databáze si zapamatujeme jeho ID.
+        /// </summary>
+        private void OnObjectAppended(object sender, ObjectEventArgs e)
+        {
+            if (!_autoAssignEnabled) return;
+            if (ActiveLevel == null) return;
+
+            // Zapamatovat ID nového objektu (pokud je to entita)
+            if (e.DBObject is Entity)
+                _pendingNewEntities.Add(e.DBObject.ObjectId);
+        }
+
+        /// <summary>
+        /// Po dokončení příkazu přiřadíme všechny nové entity do aktivní hladiny.
+        /// </summary>
+        private void OnCommandEnded(object sender, CommandEventArgs e)
+        {
+            if (_pendingNewEntities.Count == 0) return;
+
+            var activeLevel = ActiveLevel;
+            var doc = _trackedDoc;
+            var db = _trackedDb;
+
+            // Zkopírovat a vyčistit pending list
+            var pending = new List<ObjectId>(_pendingNewEntities);
+            _pendingNewEntities.Clear();
+
+            if (activeLevel == null || doc == null || db == null) return;
+
+            // Ignorovat určité interní příkazy, které vytváří dočasné objekty
+            var cmdName = e.GlobalCommandName?.ToUpperInvariant() ?? "";
+            if (cmdName == "UNDO" || cmdName == "REDO" || cmdName == "U" ||
+                cmdName == "REGEN" || cmdName == "REGENALL" || cmdName == "ZOOM" ||
+                cmdName == "PAN" || cmdName == "REDRAW" || cmdName.StartsWith("VW_"))
+                return;
+
+            try
+            {
+                using var tr = db.TransactionManager.StartTransaction();
+                EnsureRegApp(db, tr);
+
+                var modelSpaceId = SymbolUtilityServices.GetBlockModelSpaceId(db);
+
+                foreach (var id in pending)
+                {
+                    if (id.IsNull || id.IsErased) continue;
+
+                    try
+                    {
+                        var obj = tr.GetObject(id, OpenMode.ForRead);
+                        if (obj is not Entity ent) continue;
+                        if (ent.IsErased) continue;
+
+                        // Jen entity v ModelSpace
+                        if (ent.OwnerId != modelSpaceId) continue;
+
+                        // Přeskočit pokud už má level přiřazený
+                        var existing = ent.GetXDataForApplication(XDataAppName);
+                        if (existing != null) continue;
+
+                        // Přiřadit do aktivní hladiny
+                        ent.UpgradeOpen();
+                        ent.XData = new ResultBuffer(
+                            new TypedValue((int)DxfCode.ExtendedDataRegAppName, XDataAppName),
+                            new TypedValue((int)DxfCode.ExtendedDataAsciiString, activeLevel.Name));
+                    }
+                    catch
+                    {
+                        // Přeskočit problematické entity (temp objects, erased, etc.)
+                    }
+                }
+
+                tr.Commit();
+            }
+            catch
+            {
+                // Tiše ignorovat chyby při auto-assign
+            }
+        }
 
         /// <summary>
         /// Načte hladiny z XData entit v dokumentu.
@@ -86,6 +208,9 @@ namespace BricsLayerPlugin.Managers
             {
                 _levels[0].IsActive = true;
             }
+
+            // Zapnout auto-assign pro tento dokument
+            EnableAutoAssign(doc);
 
             LevelsChanged?.Invoke();
         }
@@ -192,7 +317,6 @@ namespace BricsLayerPlugin.Managers
                 {
                     case VwLevelState.On:
                         ent.Visible = true;
-                        // Obnovit barvu dle vrstvy (třídy)
                         ent.Color = Color.FromColorIndex(ColorMethod.ByLayer, 256);
                         break;
                     case VwLevelState.Off:
@@ -200,11 +324,9 @@ namespace BricsLayerPlugin.Managers
                         break;
                     case VwLevelState.Grayed:
                         ent.Visible = true;
-                        // Šedá barva pro vizuální odlišení
                         ent.Color = Color.FromColorIndex(ColorMethod.ByAci, 8);
                         break;
                 }
-
             }
 
             doc.TransactionManager.QueueForGraphicsFlush();
@@ -255,7 +377,6 @@ namespace BricsLayerPlugin.Managers
                 SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
             var dot = (DrawOrderTable)tr.GetObject(btr.DrawOrderTableId, OpenMode.ForWrite);
 
-            // Seřadit hladiny od nejnižší po nejvyšší
             foreach (var level in _levels.OrderBy(l => l.Order))
             {
                 var ids = new ObjectIdCollection();
@@ -298,7 +419,6 @@ namespace BricsLayerPlugin.Managers
 
                 if (targetLevelName != null)
                 {
-                    // Přesunout na jinou hladinu
                     ent.XData = new ResultBuffer(
                         new TypedValue((int)DxfCode.ExtendedDataRegAppName, XDataAppName),
                         new TypedValue((int)DxfCode.ExtendedDataAsciiString, targetLevelName)
@@ -306,13 +426,11 @@ namespace BricsLayerPlugin.Managers
                 }
                 else
                 {
-                    // Odstranit XData
                     ent.XData = new ResultBuffer(
                         new TypedValue((int)DxfCode.ExtendedDataRegAppName, XDataAppName)
                     );
                 }
 
-                // Obnovit viditelnost
                 ent.Visible = true;
                 ent.Color = Color.FromColorIndex(ColorMethod.ByLayer, 256);
             }

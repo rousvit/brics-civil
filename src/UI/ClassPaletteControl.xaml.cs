@@ -45,16 +45,37 @@ namespace BricsLayerPlugin.UI
             ActiveClassText.Text = active != null ? active.Name : "(žádná)";
         }
 
-        /// <summary>
-        /// Set the correct ComboBox selection when loaded in DataTemplate.
-        /// </summary>
         private void VisibilityCombo_Loaded(object sender, RoutedEventArgs e)
         {
             if (sender is ComboBox combo && combo.DataContext is VwClass cls)
             {
                 _isRefreshing = true;
-                combo.SelectedIndex = (int)cls.Visibility; // On=0, Off=1, Grayed=2
+                combo.SelectedIndex = (int)cls.Visibility;
                 _isRefreshing = false;
+            }
+        }
+
+        /// <summary>
+        /// ► tlačítko - přepínač aktivní třídy přímo v řádku.
+        /// </summary>
+        private void ActivateClass_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn) return;
+            if (btn.DataContext is not VwClass cls) return;
+
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+
+            try
+            {
+                using (doc.LockDocument())
+                {
+                    ClassManager.Instance.SetActive(cls, doc);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -89,7 +110,11 @@ namespace BricsLayerPlugin.UI
                         dialog.ColorIndex,
                         dialog.LinetypeName,
                         dialog.LineweightMm,
-                        dialog.Transparency);
+                        dialog.Transparency,
+                        dialog.IsTrueColor,
+                        dialog.ColorRed,
+                        dialog.ColorGreen,
+                        dialog.ColorBlue);
                 }
             }
             catch (System.Exception ex)
@@ -150,13 +175,21 @@ namespace BricsLayerPlugin.UI
                 lineweight: cls.LineweightMm,
                 transparency: cls.Transparency,
                 availableLinetypes: linetypes,
-                isNew: false);
+                isNew: false,
+                isTrueColor: cls.IsTrueColor,
+                colorR: cls.ColorRed,
+                colorG: cls.ColorGreen,
+                colorB: cls.ColorBlue);
 
             if (dialog.ShowDialog() != true) return;
 
             try
             {
                 cls.ColorIndex = dialog.ColorIndex;
+                cls.IsTrueColor = dialog.IsTrueColor;
+                cls.ColorRed = dialog.ColorRed;
+                cls.ColorGreen = dialog.ColorGreen;
+                cls.ColorBlue = dialog.ColorBlue;
                 cls.LinetypeName = dialog.LinetypeName;
                 cls.LineweightMm = dialog.LineweightMm;
                 cls.Transparency = dialog.Transparency;
@@ -172,44 +205,9 @@ namespace BricsLayerPlugin.UI
             }
         }
 
-        private void SetActive_Click(object sender, RoutedEventArgs e)
-        {
-            if (ClassListView.SelectedItem is not VwClass cls) return;
-
-            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
-            if (doc == null) return;
-
-            try
-            {
-                using (doc.LockDocument())
-                {
-                    ClassManager.Instance.SetActive(cls, doc);
-                }
-            }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
         private void ClassListView_DoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            if (ClassListView.SelectedItem is not VwClass cls) return;
-
-            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
-            if (doc == null) return;
-
-            try
-            {
-                using (doc.LockDocument())
-                {
-                    ClassManager.Instance.SetActive(cls, doc);
-                }
-            }
-            catch (System.Exception ex)
-            {
-                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            EditClass_Click(sender, e);
         }
 
         private void VisibilityCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -268,11 +266,11 @@ namespace BricsLayerPlugin.UI
             {
                 DetailPanel.Visibility = Visibility.Visible;
                 DetailName.Text = cls.IsActive ? $"{cls.Name} (aktivní)" : cls.Name;
-                DetailColorText.Text = $"ACI {cls.ColorIndex}";
+                DetailColorText.Text = cls.ColorDisplay;
                 DetailLinetype.Text = cls.LinetypeName;
                 DetailLineweight.Text = $"{cls.LineweightMm} mm";
                 DetailTransparency.Text = $"{cls.Transparency}%";
-                DetailColorSwatch.Fill = new SolidColorBrush(ClassEditDialog.AciToApproxColor(cls.ColorIndex));
+                DetailColorSwatch.Fill = new SolidColorBrush(ClassEditDialog.GetDisplayColor(cls));
             }
             else
             {

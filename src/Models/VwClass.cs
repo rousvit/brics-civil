@@ -9,8 +9,20 @@ namespace BricsLayerPlugin.Models
     {
         public string Name { get; set; } = string.Empty;
 
-        /// <summary>ACI barva (1-255).</summary>
+        /// <summary>ACI barva (1-255). Použito pokud IsTrueColor == false.</summary>
         public int ColorIndex { get; set; } = 7;
+
+        /// <summary>True color (RGB). Pokud true, použít ColorRed/Green/Blue místo ColorIndex.</summary>
+        public bool IsTrueColor { get; set; }
+
+        /// <summary>Červená složka true color (0-255).</summary>
+        public byte ColorRed { get; set; }
+
+        /// <summary>Zelená složka true color (0-255).</summary>
+        public byte ColorGreen { get; set; }
+
+        /// <summary>Modrá složka true color (0-255).</summary>
+        public byte ColorBlue { get; set; }
 
         /// <summary>Název typu čáry (Continuous, Dashed, …).</summary>
         public string LinetypeName { get; set; } = "Continuous";
@@ -30,7 +42,12 @@ namespace BricsLayerPlugin.Models
         /// <summary>Název BricsCAD vrstvy (LayerTableRecord.Name).</summary>
         public string BricsLayerName { get; set; } = string.Empty;
 
-        public override string ToString() => $"{Name} [Color={ColorIndex}, LT={LinetypeName}, LW={LineweightMm}mm]";
+        /// <summary>Popis barvy pro zobrazení v UI.</summary>
+        public string ColorDisplay => IsTrueColor
+            ? $"RGB({ColorRed},{ColorGreen},{ColorBlue})"
+            : $"ACI {ColorIndex}";
+
+        public override string ToString() => $"{Name} [{ColorDisplay}, LT={LinetypeName}, LW={LineweightMm}mm]";
     }
 
     public enum VwClassVisibility
