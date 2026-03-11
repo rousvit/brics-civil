@@ -204,8 +204,10 @@ namespace BricsLayerPlugin.Managers
                         ent.Color = Color.FromColorIndex(ColorMethod.ByAci, 8);
                         break;
                 }
+
             }
 
+            doc.TransactionManager.QueueForGraphicsFlush();
             tr.Commit();
         }
 
@@ -269,6 +271,7 @@ namespace BricsLayerPlugin.Managers
                     dot.MoveToTop(ids);
             }
 
+            doc.TransactionManager.QueueForGraphicsFlush();
             tr.Commit();
         }
 

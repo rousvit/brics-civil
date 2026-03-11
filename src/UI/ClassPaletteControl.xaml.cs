@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -11,6 +12,8 @@ namespace BricsLayerPlugin.UI
 {
     public partial class ClassPaletteControl : UserControl
     {
+        private bool _isRefreshing;
+
         public ClassPaletteControl()
         {
             InitializeComponent();
@@ -22,9 +25,17 @@ namespace BricsLayerPlugin.UI
         {
             Dispatcher.Invoke(() =>
             {
-                ClassListView.ItemsSource = null;
-                ClassListView.ItemsSource = ClassManager.Instance.Classes;
-                UpdateActiveClassDisplay();
+                _isRefreshing = true;
+                try
+                {
+                    ClassListView.ItemsSource = null;
+                    ClassListView.ItemsSource = ClassManager.Instance.Classes;
+                    UpdateActiveClassDisplay();
+                }
+                finally
+                {
+                    _isRefreshing = false;
+                }
             });
         }
 
@@ -34,48 +45,54 @@ namespace BricsLayerPlugin.UI
             ActiveClassText.Text = active != null ? active.Name : "(žádná)";
         }
 
+        /// <summary>
+        /// Set the correct ComboBox selection when loaded in DataTemplate.
+        /// </summary>
+        private void VisibilityCombo_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is ComboBox combo && combo.DataContext is VwClass cls)
+            {
+                _isRefreshing = true;
+                combo.SelectedIndex = (int)cls.Visibility; // On=0, Off=1, Grayed=2
+                _isRefreshing = false;
+            }
+        }
+
         private void AddClass_Click(object sender, RoutedEventArgs e)
         {
             var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
-            var nameDialog = new InputDialog("Nová třída", "Zadejte název třídy:");
-            if (nameDialog.ShowDialog() != true) return;
+            List<string> linetypes;
+            using (doc.LockDocument())
+            {
+                linetypes = ClassManager.Instance.GetAvailableLinetypes(doc);
+            }
+
+            var dialog = new ClassEditDialog(
+                name: "",
+                colorIndex: 7,
+                linetype: "Continuous",
+                lineweight: 0.25,
+                transparency: 0,
+                availableLinetypes: linetypes,
+                isNew: true);
+
+            if (dialog.ShowDialog() != true) return;
 
             try
             {
-                // Dialog pro barvu
-                int colorIndex = 7;
-                var colorDialog = new InputDialog("Barva", "Index barvy ACI (1-255) [7]:");
-                if (colorDialog.ShowDialog() == true && int.TryParse(colorDialog.InputText, out var ci))
-                    colorIndex = Math.Clamp(ci, 1, 255);
-
-                // Dialog pro typ čáry
-                string linetype = "Continuous";
-                var linetypes = ClassManager.Instance.GetAvailableLinetypes(doc);
-                var ltDialog = new InputDialog("Typ čáry",
-                    $"Typ čáry [{string.Join(", ", linetypes)}]:");
-                if (ltDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(ltDialog.InputText))
-                    linetype = ltDialog.InputText;
-
-                // Dialog pro tloušťku
-                double lineweight = 0.25;
-                var lwDialog = new InputDialog("Tloušťka čáry", "Tloušťka čáry v mm [0.25]:");
-                if (lwDialog.ShowDialog() == true && double.TryParse(lwDialog.InputText,
-                    System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out var lw))
-                    lineweight = lw;
-
-                // Dialog pro průhlednost
-                int transparency = 0;
-                var trDialog = new InputDialog("Průhlednost", "Průhlednost 0-90% [0]:");
-                if (trDialog.ShowDialog() == true && int.TryParse(trDialog.InputText, out var tr))
-                    transparency = Math.Clamp(tr, 0, 90);
-
-                ClassManager.Instance.CreateClass(nameDialog.InputText, doc,
-                    colorIndex, linetype, lineweight, transparency);
+                using (doc.LockDocument())
+                {
+                    ClassManager.Instance.CreateClass(
+                        dialog.ClassName, doc,
+                        dialog.ColorIndex,
+                        dialog.LinetypeName,
+                        dialog.LineweightMm,
+                        dialog.Transparency);
+                }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -102,9 +119,12 @@ namespace BricsLayerPlugin.UI
 
             try
             {
-                ClassManager.Instance.DeleteClass(cls, doc);
+                using (doc.LockDocument())
+                {
+                    ClassManager.Instance.DeleteClass(cls, doc);
+                }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -117,31 +137,39 @@ namespace BricsLayerPlugin.UI
             var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
-            // Barva
-            var colorDialog = new InputDialog("Barva", $"Index barvy ACI [{cls.ColorIndex}]:");
-            if (colorDialog.ShowDialog() == true && int.TryParse(colorDialog.InputText, out var ci))
-                cls.ColorIndex = Math.Clamp(ci, 1, 255);
+            List<string> linetypes;
+            using (doc.LockDocument())
+            {
+                linetypes = ClassManager.Instance.GetAvailableLinetypes(doc);
+            }
 
-            // Typ čáry
-            var linetypes = ClassManager.Instance.GetAvailableLinetypes(doc);
-            var ltDialog = new InputDialog("Typ čáry",
-                $"Typ čáry [{cls.LinetypeName}]\nDostupné: {string.Join(", ", linetypes)}");
-            if (ltDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(ltDialog.InputText))
-                cls.LinetypeName = ltDialog.InputText;
+            var dialog = new ClassEditDialog(
+                name: cls.Name,
+                colorIndex: cls.ColorIndex,
+                linetype: cls.LinetypeName,
+                lineweight: cls.LineweightMm,
+                transparency: cls.Transparency,
+                availableLinetypes: linetypes,
+                isNew: false);
 
-            // Tloušťka
-            var lwDialog = new InputDialog("Tloušťka", $"Tloušťka v mm [{cls.LineweightMm}]:");
-            if (lwDialog.ShowDialog() == true && double.TryParse(lwDialog.InputText,
-                System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var lw))
-                cls.LineweightMm = lw;
+            if (dialog.ShowDialog() != true) return;
 
-            // Průhlednost
-            var trDialog = new InputDialog("Průhlednost", $"Průhlednost 0-90% [{cls.Transparency}]:");
-            if (trDialog.ShowDialog() == true && int.TryParse(trDialog.InputText, out var tr))
-                cls.Transparency = Math.Clamp(tr, 0, 90);
+            try
+            {
+                cls.ColorIndex = dialog.ColorIndex;
+                cls.LinetypeName = dialog.LinetypeName;
+                cls.LineweightMm = dialog.LineweightMm;
+                cls.Transparency = dialog.Transparency;
 
-            ClassManager.Instance.UpdateClassProperties(cls, doc);
+                using (doc.LockDocument())
+                {
+                    ClassManager.Instance.UpdateClassProperties(cls, doc);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void SetActive_Click(object sender, RoutedEventArgs e)
@@ -151,22 +179,42 @@ namespace BricsLayerPlugin.UI
             var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
-            ClassManager.Instance.SetActive(cls, doc);
+            try
+            {
+                using (doc.LockDocument())
+                {
+                    ClassManager.Instance.SetActive(cls, doc);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void ClassListView_DoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            // Dvojklik = nastavit jako aktivní třídu
             if (ClassListView.SelectedItem is not VwClass cls) return;
 
             var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
-            ClassManager.Instance.SetActive(cls, doc);
+            try
+            {
+                using (doc.LockDocument())
+                {
+                    ClassManager.Instance.SetActive(cls, doc);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void VisibilityCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_isRefreshing) return;
             if (sender is not ComboBox combo) return;
             if (combo.DataContext is not VwClass cls) return;
 
@@ -182,14 +230,36 @@ namespace BricsLayerPlugin.UI
                 _ => VwClassVisibility.On
             };
 
-            ClassManager.Instance.SetVisibility(cls, visibility, doc);
+            try
+            {
+                using (doc.LockDocument())
+                {
+                    ClassManager.Instance.SetVisibility(cls, visibility, doc);
+                }
+                BcadApplication.UpdateScreen();
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void Refresh_Click(object sender, RoutedEventArgs e)
         {
             var doc = BcadApplication.DocumentManager.MdiActiveDocument;
-            if (doc != null)
-                ClassManager.Instance.LoadFromDocument(doc);
+            if (doc == null) return;
+
+            try
+            {
+                using (doc.LockDocument())
+                {
+                    ClassManager.Instance.LoadFromDocument(doc);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void ClassListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -202,26 +272,12 @@ namespace BricsLayerPlugin.UI
                 DetailLinetype.Text = cls.LinetypeName;
                 DetailLineweight.Text = $"{cls.LineweightMm} mm";
                 DetailTransparency.Text = $"{cls.Transparency}%";
-                DetailColorSwatch.Fill = new SolidColorBrush(AciToApproxColor(cls.ColorIndex));
+                DetailColorSwatch.Fill = new SolidColorBrush(ClassEditDialog.AciToApproxColor(cls.ColorIndex));
             }
             else
             {
                 DetailPanel.Visibility = Visibility.Collapsed;
             }
         }
-
-        private static System.Windows.Media.Color AciToApproxColor(int aci) => aci switch
-        {
-            1 => Colors.Red,
-            2 => Colors.Yellow,
-            3 => Colors.Lime,
-            4 => Colors.Cyan,
-            5 => Colors.Blue,
-            6 => Colors.Magenta,
-            7 => Colors.White,
-            8 => Colors.Gray,
-            9 => Colors.LightGray,
-            _ => Colors.White
-        };
     }
 }

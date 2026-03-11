@@ -63,6 +63,7 @@ namespace BricsLayerPlugin.Commands
                 return;
             }
 
+            ed.WriteMessage($"\nVyberte objekty pro přiřazení do hladiny '{level.Name}':");
             var selResult = ed.GetSelection();
             if (selResult.Status != PromptStatus.OK) return;
 
@@ -71,7 +72,44 @@ namespace BricsLayerPlugin.Commands
                 ids.Add(selObj.ObjectId);
 
             LevelManager.Instance.AssignEntitiesToLevel(ids, level, doc);
+
+            // Auto-sync draw order and visibility after assignment
+            LevelManager.Instance.SyncDrawOrder(doc);
+            if (level.State != VwLevelState.On)
+                LevelManager.Instance.SyncAllVisibility(doc);
+
             ed.WriteMessage($"\nHladina '{level.Name}' přiřazena {ids.Count} objektům.");
+        }
+
+        [CommandMethod("VW_LEVEL_INFO")]
+        public void LevelInfo()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+            var ed = doc.Editor;
+
+            ed.WriteMessage("\nVyberte objekty pro zjištění hladiny:");
+            var selResult = ed.GetSelection();
+            if (selResult.Status != PromptStatus.OK) return;
+
+            var db = doc.Database;
+            using var tr = db.TransactionManager.StartTransaction();
+
+            foreach (SelectedObject selObj in selResult.Value)
+            {
+                var ent = (Entity)tr.GetObject(selObj.ObjectId, OpenMode.ForRead);
+                var levelName = LevelManager.GetEntityLevelName(ent);
+                var typeName = ent.GetType().Name;
+                var layerName = ent.Layer;
+
+                if (levelName != null)
+                    ed.WriteMessage($"\n  {typeName} (vrstva: {layerName}) -> Hladina: {levelName}");
+                else
+                    ed.WriteMessage($"\n  {typeName} (vrstva: {layerName}) -> Nepřiřazeno k žádné hladině");
+            }
+
+            tr.Commit();
+            ed.WriteMessage($"\n--- {selResult.Value.Count} objektů zkontrolováno ---");
         }
 
         [CommandMethod("VW_LEVEL_STATE")]

@@ -29,6 +29,11 @@
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Margin" Value="5,2"/>
         </Style>
+        <Style x:Key="DarkCombo" TargetType="ComboBox">
+            <Setter Property="Background" Value="#3E3E42"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#555"/>
+        </Style>
     </UserControl.Resources>
 
     <DockPanel>
@@ -45,13 +50,13 @@
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="5,0">
             <Button Content="+" Style="{StaticResource DarkButton}" Click="AddClass_Click"
                     ToolTip="Nová třída" Width="32"/>
-            <Button Content="✕" Style="{StaticResource DarkButton}" Click="DeleteClass_Click"
+            <Button Content="&#x2715;" Style="{StaticResource DarkButton}" Click="DeleteClass_Click"
                     ToolTip="Smazat třídu" Width="32"/>
-            <Button Content="✎" Style="{StaticResource DarkButton}" Click="EditClass_Click"
+            <Button Content="&#x270E;" Style="{StaticResource DarkButton}" Click="EditClass_Click"
                     ToolTip="Upravit vlastnosti" Width="32"/>
-            <Button Content="✓" Style="{StaticResource DarkButton}" Click="SetActive_Click"
+            <Button Content="&#x2713;" Style="{StaticResource DarkButton}" Click="SetActive_Click"
                     ToolTip="Nastavit jako aktivní" Width="32"/>
-            <Button Content="⟳" Style="{StaticResource DarkButton}" Click="Refresh_Click"
+            <Button Content="&#x27F3;" Style="{StaticResource DarkButton}" Click="Refresh_Click"
                     ToolTip="Obnovit" Width="32"/>
         </StackPanel>
 
@@ -88,16 +93,21 @@
                   MouseDoubleClick="ClassListView_DoubleClick">
             <ListView.View>
                 <GridView>
-                    <GridViewColumn Header="Viditelnost" Width="70">
+                    <GridViewColumn Header="Viditelnost" Width="80">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <ComboBox SelectedItem="{Binding Visibility}"
-                                          Background="#3E3E42" Foreground="White"
+                                <ComboBox Style="{StaticResource DarkCombo}"
+                                          Loaded="VisibilityCombo_Loaded"
                                           SelectionChanged="VisibilityCombo_SelectionChanged"
-                                          Width="60">
-                                    <ComboBoxItem Content="On"/>
-                                    <ComboBoxItem Content="Off"/>
-                                    <ComboBoxItem Content="Grayed"/>
+                                          Width="68">
+                                    <ComboBox.Resources>
+                                        <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#3E3E42"/>
+                                        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#007ACC"/>
+                                        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White"/>
+                                    </ComboBox.Resources>
+                                    <ComboBoxItem Content="On" Foreground="White"/>
+                                    <ComboBoxItem Content="Off" Foreground="White"/>
+                                    <ComboBoxItem Content="Grayed" Foreground="White"/>
                                 </ComboBox>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>

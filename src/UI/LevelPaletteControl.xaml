@@ -29,6 +29,11 @@
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Margin" Value="5,2"/>
         </Style>
+        <Style x:Key="DarkCombo" TargetType="ComboBox">
+            <Setter Property="Background" Value="#3E3E42"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#555"/>
+        </Style>
     </UserControl.Resources>
 
     <DockPanel>
@@ -42,24 +47,34 @@
         </StackPanel>
 
         <!-- Toolbar -->
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="5,0">
-            <Button Content="▲" Style="{StaticResource DarkButton}" Click="MoveUp_Click"
+        <WrapPanel DockPanel.Dock="Top" Margin="5,0">
+            <Button Content="&#x25B2;" Style="{StaticResource DarkButton}" Click="MoveUp_Click"
                     ToolTip="Posunout nahoru (vyšší = nahoře)" Width="32"/>
-            <Button Content="▼" Style="{StaticResource DarkButton}" Click="MoveDown_Click"
+            <Button Content="&#x25BC;" Style="{StaticResource DarkButton}" Click="MoveDown_Click"
                     ToolTip="Posunout dolů" Width="32"/>
             <Button Content="+" Style="{StaticResource DarkButton}" Click="AddLevel_Click"
                     ToolTip="Nová hladina" Width="32"/>
-            <Button Content="✕" Style="{StaticResource DarkButton}" Click="DeleteLevel_Click"
+            <Button Content="&#x2715;" Style="{StaticResource DarkButton}" Click="DeleteLevel_Click"
                     ToolTip="Smazat hladinu" Width="32"/>
-            <Button Content="✓" Style="{StaticResource DarkButton}" Click="SetActive_Click"
+            <Button Content="&#x2713;" Style="{StaticResource DarkButton}" Click="SetActive_Click"
                     ToolTip="Nastavit jako aktivní" Width="32"/>
-            <Button Content="→" Style="{StaticResource DarkButton}" Click="AssignToLevel_Click"
-                    ToolTip="Přiřadit vybrané objekty" Width="32"/>
+            <Button Content="&#x2192;" Style="{StaticResource DarkButton}" Click="AssignToLevel_Click"
+                    ToolTip="Přiřadit vybrané objekty do hladiny" Width="32"/>
+            <Button Content="?" Style="{StaticResource DarkButton}" Click="InfoLevel_Click"
+                    ToolTip="Zjistit hladinu vybraného objektu" Width="32"/>
             <Button Content="Sync" Style="{StaticResource DarkButton}" Click="SyncOrder_Click"
                     ToolTip="Synchronizovat pořadí vykreslování"/>
-            <Button Content="⟳" Style="{StaticResource DarkButton}" Click="Refresh_Click"
+            <Button Content="&#x27F3;" Style="{StaticResource DarkButton}" Click="Refresh_Click"
                     ToolTip="Obnovit" Width="32"/>
-        </StackPanel>
+        </WrapPanel>
+
+        <!-- Info panel pro vybraný objekt -->
+        <Border DockPanel.Dock="Bottom" Background="#252526" Margin="5" Padding="6"
+                BorderBrush="#444" BorderThickness="1" CornerRadius="3">
+            <StackPanel x:Name="InfoPanel" Visibility="Collapsed">
+                <TextBlock x:Name="InfoText" Foreground="#AAA" FontSize="11" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
 
         <!-- Level list -->
         <ListView x:Name="LevelListView"
@@ -69,16 +84,21 @@
             <ListView.View>
                 <GridView>
                     <GridViewColumn Header="#" Width="35" DisplayMemberBinding="{Binding Order}"/>
-                    <GridViewColumn Header="Stav" Width="70">
+                    <GridViewColumn Header="Stav" Width="80">
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
-                                <ComboBox SelectedItem="{Binding State}"
-                                          Background="#3E3E42" Foreground="White"
+                                <ComboBox Style="{StaticResource DarkCombo}"
+                                          Loaded="StateCombo_Loaded"
                                           SelectionChanged="StateCombo_SelectionChanged"
-                                          Width="60">
-                                    <ComboBoxItem Content="On"/>
-                                    <ComboBoxItem Content="Off"/>
-                                    <ComboBoxItem Content="Grayed"/>
+                                          Width="68">
+                                    <ComboBox.Resources>
+                                        <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#3E3E42"/>
+                                        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#007ACC"/>
+                                        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White"/>
+                                    </ComboBox.Resources>
+                                    <ComboBoxItem Content="On" Foreground="White"/>
+                                    <ComboBoxItem Content="Off" Foreground="White"/>
+                                    <ComboBoxItem Content="Grayed" Foreground="White"/>
                                 </ComboBox>
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>

@@ -12,6 +12,8 @@ namespace BricsLayerPlugin.UI
 {
     public partial class LevelPaletteControl : UserControl
     {
+        private bool _isRefreshing;
+
         public LevelPaletteControl()
         {
             InitializeComponent();
@@ -23,9 +25,17 @@ namespace BricsLayerPlugin.UI
         {
             Dispatcher.Invoke(() =>
             {
-                LevelListView.ItemsSource = null;
-                LevelListView.ItemsSource = LevelManager.Instance.Levels;
-                UpdateActiveLevelDisplay();
+                _isRefreshing = true;
+                try
+                {
+                    LevelListView.ItemsSource = null;
+                    LevelListView.ItemsSource = LevelManager.Instance.Levels;
+                    UpdateActiveLevelDisplay();
+                }
+                finally
+                {
+                    _isRefreshing = false;
+                }
             });
         }
 
@@ -35,25 +45,59 @@ namespace BricsLayerPlugin.UI
             ActiveLevelText.Text = active != null ? active.Name : "(žádná)";
         }
 
+        /// <summary>
+        /// Set the correct ComboBox selection when the ComboBox loads in the DataTemplate.
+        /// This fixes the broken SelectedItem binding to enum.
+        /// </summary>
+        private void StateCombo_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is ComboBox combo && combo.DataContext is VwLevel level)
+            {
+                _isRefreshing = true;
+                combo.SelectedIndex = (int)level.State; // On=0, Off=1, Grayed=2
+                _isRefreshing = false;
+            }
+        }
+
         private void MoveUp_Click(object sender, RoutedEventArgs e)
         {
-            if (LevelListView.SelectedItem is VwLevel level)
+            if (LevelListView.SelectedItem is not VwLevel level) return;
+
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+
+            try
             {
-                LevelManager.Instance.MoveUp(level);
-                var doc = BcadApplication.DocumentManager.MdiActiveDocument;
-                if (doc != null)
+                using (doc.LockDocument())
+                {
+                    LevelManager.Instance.MoveUp(level);
                     LevelManager.Instance.SyncDrawOrder(doc);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void MoveDown_Click(object sender, RoutedEventArgs e)
         {
-            if (LevelListView.SelectedItem is VwLevel level)
+            if (LevelListView.SelectedItem is not VwLevel level) return;
+
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+
+            try
             {
-                LevelManager.Instance.MoveDown(level);
-                var doc = BcadApplication.DocumentManager.MdiActiveDocument;
-                if (doc != null)
+                using (doc.LockDocument())
+                {
+                    LevelManager.Instance.MoveDown(level);
                     LevelManager.Instance.SyncDrawOrder(doc);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -66,7 +110,7 @@ namespace BricsLayerPlugin.UI
             {
                 LevelManager.Instance.CreateLevel(dialog.InputText);
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -79,7 +123,6 @@ namespace BricsLayerPlugin.UI
             var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
-            // Výběr cílové hladiny pro přesun objektů
             string? targetLevel = null;
             if (LevelManager.Instance.Levels.Count > 1)
             {
@@ -97,9 +140,12 @@ namespace BricsLayerPlugin.UI
 
             try
             {
-                LevelManager.Instance.DeleteLevel(level, doc, targetLevel);
+                using (doc.LockDocument())
+                {
+                    LevelManager.Instance.DeleteLevel(level, doc, targetLevel);
+                }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -117,6 +163,10 @@ namespace BricsLayerPlugin.UI
                 LevelManager.Instance.SetActive(level);
         }
 
+        /// <summary>
+        /// Přiřadit vybrané objekty do zvolené hladiny.
+        /// Spustí příkaz VW_LEVEL_ASSIGN s předvyplněným názvem hladiny.
+        /// </summary>
         private void AssignToLevel_Click(object sender, RoutedEventArgs e)
         {
             if (LevelListView.SelectedItem is not VwLevel level) return;
@@ -124,20 +174,24 @@ namespace BricsLayerPlugin.UI
             var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
-            var ed = doc.Editor;
-            ed.WriteMessage($"\nVyberte objekty pro přiřazení do hladiny '{level.Name}'...");
+            // Launch the assign command with the level name pre-filled
+            doc.SendStringToExecute("VW_LEVEL_ASSIGN\n" + level.Name + "\n", true, false, false);
+        }
 
-            // Instrukce - výběr entit přes příkazovou řádku
-            MessageBox.Show(
-                $"Pro přiřazení objektů do hladiny '{level.Name}':\n\n" +
-                $"1. Vyberte objekty v kreslicí ploše\n" +
-                $"2. Zadejte příkaz: VW_LEVEL_ASSIGN\n" +
-                $"3. Zadejte název hladiny: {level.Name}",
-                "Přiřazení do hladiny", MessageBoxButton.OK, MessageBoxImage.Information);
+        /// <summary>
+        /// Zjistit hladinu vybraných objektů.
+        /// </summary>
+        private void InfoLevel_Click(object sender, RoutedEventArgs e)
+        {
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+
+            doc.SendStringToExecute("VW_LEVEL_INFO\n", true, false, false);
         }
 
         private void StateCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_isRefreshing) return;
             if (sender is not ComboBox combo) return;
             if (combo.DataContext is not VwLevel level) return;
 
@@ -153,21 +207,56 @@ namespace BricsLayerPlugin.UI
                 _ => VwLevelState.On
             };
 
-            LevelManager.Instance.SetState(level, state, doc);
+            try
+            {
+                using (doc.LockDocument())
+                {
+                    LevelManager.Instance.SetState(level, state, doc);
+                }
+                // Force screen refresh
+                BcadApplication.UpdateScreen();
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void SyncOrder_Click(object sender, RoutedEventArgs e)
         {
             var doc = BcadApplication.DocumentManager.MdiActiveDocument;
-            if (doc != null)
-                LevelManager.Instance.SyncDrawOrder(doc);
+            if (doc == null) return;
+
+            try
+            {
+                using (doc.LockDocument())
+                {
+                    LevelManager.Instance.SyncDrawOrder(doc);
+                }
+                BcadApplication.UpdateScreen();
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void Refresh_Click(object sender, RoutedEventArgs e)
         {
             var doc = BcadApplication.DocumentManager.MdiActiveDocument;
-            if (doc != null)
-                LevelManager.Instance.LoadFromDocument(doc);
+            if (doc == null) return;
+
+            try
+            {
+                using (doc.LockDocument())
+                {
+                    LevelManager.Instance.LoadFromDocument(doc);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 }
