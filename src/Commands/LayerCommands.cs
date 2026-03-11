@@ -40,7 +40,7 @@ namespace BricsLayerPlugin.Commands
                 var level = LevelManager.Instance.CreateLevel(nameResult.StringResult);
                 ed.WriteMessage($"\nHladina '{level.Name}' vytvořena.");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 ed.WriteMessage($"\nChyba: {ex.Message}");
             }

@@ -55,7 +55,7 @@ namespace BricsLayerPlugin.Commands
                 var cls = ClassManager.Instance.CreateClass(nameResult.StringResult, doc, color, linetype, lw);
                 ed.WriteMessage($"\nTřída '{cls.Name}' vytvořena: {cls}");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 ed.WriteMessage($"\nChyba: {ex.Message}");
             }
