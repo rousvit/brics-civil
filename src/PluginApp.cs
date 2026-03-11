@@ -3,26 +3,30 @@ using Teigha.Runtime;
 using BricsLayerPlugin.Managers;
 
 [assembly: ExtensionApplication(typeof(BricsLayerPlugin.PluginApp))]
-[assembly: CommandClass(typeof(BricsLayerPlugin.Commands.LayerCommands))]
 [assembly: CommandClass(typeof(BricsLayerPlugin.Commands.ClassCommands))]
+[assembly: CommandClass(typeof(BricsLayerPlugin.Commands.LevelCommands))]
 
 namespace BricsLayerPlugin
 {
     /// <summary>
     /// Vstupní bod pluginu pro BricsCAD.
-    /// Inicializuje správce vrstev a tříd po načtení.
+    /// Implementuje organizaci výkresu ve stylu Vectorworks:
+    /// - Třídy (Classes) = BricsCAD vrstvy (vizuální vlastnosti)
+    /// - Hladiny (Levels) = virtuální organizace (draw order, seskupení)
     /// </summary>
     public class PluginApp : IExtensionApplication
     {
         public void Initialize()
         {
             var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-            ed?.WriteMessage("\n=== BricsLayerPlugin (Vectorworks styl) načten ===");
-            ed?.WriteMessage("\nVrstvy: VW_LAYERS, VW_LAYER_NEW, VW_LAYER_STATE, VW_LAYER_UP, VW_LAYER_DOWN, VW_LAYER_SYNC");
-            ed?.WriteMessage("\nTřídy:  VW_CLASSES, VW_CLASS_NEW, VW_CLASS_ASSIGN, VW_CLASS_UPDATE, VW_CLASS_LIST");
-            ed?.WriteMessage("\nTip:    Okno lze dokovat přetažením k okraji, nebo použít jako plovoucí panel.");
+            ed?.WriteMessage("\n=== BricsLayerPlugin (Vectorworks styl) v2.0 ===");
+            ed?.WriteMessage("\nTřídy (= BricsCAD vrstvy): VW_CLASSES, VW_CLASS_NEW, VW_CLASS_ACTIVE, VW_CLASS_LIST");
+            ed?.WriteMessage("\nHladiny (organizace):       VW_LEVELS, VW_LEVEL_NEW, VW_LEVEL_ASSIGN, VW_LEVEL_STATE");
+            ed?.WriteMessage("\n                            VW_LEVEL_UP, VW_LEVEL_DOWN, VW_LEVEL_SYNC, VW_LEVEL_LIST");
+            ed?.WriteMessage("\nPanel:                      VW_PANEL (otevřít/zavřít)");
+            ed?.WriteMessage("\nTřída = vzhled objektů (barva, čára, tloušťka, průhlednost)");
+            ed?.WriteMessage("\nHladina = organizace objektů (pořadí zobrazení, viditelnost skupiny)");
 
-            // Registrovat handler pro otevření dokumentu
             Application.DocumentManager.DocumentActivated += OnDocumentActivated;
         }
 
@@ -35,9 +39,8 @@ namespace BricsLayerPlugin
         {
             if (e.Document == null) return;
 
-            // Automaticky načíst vrstvy a třídy při přepnutí dokumentu
-            LayerManager.Instance.LoadFromDocument(e.Document);
             ClassManager.Instance.LoadFromDocument(e.Document);
+            LevelManager.Instance.LoadFromDocument(e.Document);
         }
     }
 }

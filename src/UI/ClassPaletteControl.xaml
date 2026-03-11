@@ -23,12 +23,22 @@
             <Setter Property="Margin" Value="5,3"/>
             <Setter Property="FontSize" Value="11"/>
         </Style>
+        <Style x:Key="ActiveIndicator" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#4EC9B0"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="5,2"/>
+        </Style>
     </UserControl.Resources>
 
     <DockPanel>
-        <!-- Header -->
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="5">
-            <TextBlock Text="Třídy (VW)" Style="{StaticResource HeaderText}"/>
+        <!-- Header s aktivní třídou -->
+        <StackPanel DockPanel.Dock="Top" Margin="5">
+            <TextBlock Text="Třídy (Classes)" Style="{StaticResource HeaderText}"/>
+            <StackPanel Orientation="Horizontal" Margin="5,0">
+                <TextBlock Text="Aktivní:" Style="{StaticResource LabelText}"/>
+                <TextBlock x:Name="ActiveClassText" Text="(žádná)" Style="{StaticResource ActiveIndicator}"/>
+            </StackPanel>
         </StackPanel>
 
         <!-- Toolbar -->
@@ -38,9 +48,9 @@
             <Button Content="✕" Style="{StaticResource DarkButton}" Click="DeleteClass_Click"
                     ToolTip="Smazat třídu" Width="32"/>
             <Button Content="✎" Style="{StaticResource DarkButton}" Click="EditClass_Click"
-                    ToolTip="Upravit třídu" Width="32"/>
-            <Button Content="→" Style="{StaticResource DarkButton}" Click="AssignClass_Click"
-                    ToolTip="Přiřadit vybraným objektům" Width="32"/>
+                    ToolTip="Upravit vlastnosti" Width="32"/>
+            <Button Content="✓" Style="{StaticResource DarkButton}" Click="SetActive_Click"
+                    ToolTip="Nastavit jako aktivní" Width="32"/>
             <Button Content="⟳" Style="{StaticResource DarkButton}" Click="Refresh_Click"
                     ToolTip="Obnovit" Width="32"/>
         </StackPanel>
@@ -51,17 +61,21 @@
             <StackPanel x:Name="DetailPanel" Visibility="Collapsed">
                 <TextBlock x:Name="DetailName" FontWeight="Bold" Foreground="White" FontSize="13"/>
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                    <TextBlock Text="Barva:" Style="{StaticResource LabelText}" Width="70"/>
+                    <TextBlock Text="Barva:" Style="{StaticResource LabelText}" Width="80"/>
                     <Rectangle x:Name="DetailColorSwatch" Width="20" Height="16" Stroke="#555"/>
                     <TextBlock x:Name="DetailColorText" Style="{StaticResource LabelText}" Margin="5,3"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Čára:" Style="{StaticResource LabelText}" Width="70"/>
+                    <TextBlock Text="Typ čáry:" Style="{StaticResource LabelText}" Width="80"/>
                     <TextBlock x:Name="DetailLinetype" Style="{StaticResource LabelText}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Tloušťka:" Style="{StaticResource LabelText}" Width="70"/>
+                    <TextBlock Text="Tloušťka:" Style="{StaticResource LabelText}" Width="80"/>
                     <TextBlock x:Name="DetailLineweight" Style="{StaticResource LabelText}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Průhlednost:" Style="{StaticResource LabelText}" Width="80"/>
+                    <TextBlock x:Name="DetailTransparency" Style="{StaticResource LabelText}"/>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -70,13 +84,28 @@
         <ListView x:Name="ClassListView"
                   Background="#1E1E1E" Foreground="White"
                   BorderBrush="#444" Margin="5"
-                  SelectionChanged="ClassListView_SelectionChanged">
+                  SelectionChanged="ClassListView_SelectionChanged"
+                  MouseDoubleClick="ClassListView_DoubleClick">
             <ListView.View>
                 <GridView>
-                    <GridViewColumn Header="Název" Width="140" DisplayMemberBinding="{Binding Name}"/>
-                    <GridViewColumn Header="Barva" Width="50" DisplayMemberBinding="{Binding ColorIndex}"/>
-                    <GridViewColumn Header="Čára" Width="90" DisplayMemberBinding="{Binding LinetypeName}"/>
-                    <GridViewColumn Header="Tl." Width="45" DisplayMemberBinding="{Binding LineweightMm}"/>
+                    <GridViewColumn Header="Viditelnost" Width="70">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <ComboBox SelectedItem="{Binding Visibility}"
+                                          Background="#3E3E42" Foreground="White"
+                                          SelectionChanged="VisibilityCombo_SelectionChanged"
+                                          Width="60">
+                                    <ComboBoxItem Content="On"/>
+                                    <ComboBoxItem Content="Off"/>
+                                    <ComboBoxItem Content="Grayed"/>
+                                </ComboBox>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="Název" Width="120" DisplayMemberBinding="{Binding Name}"/>
+                    <GridViewColumn Header="Barva" Width="45" DisplayMemberBinding="{Binding ColorIndex}"/>
+                    <GridViewColumn Header="Čára" Width="80" DisplayMemberBinding="{Binding LinetypeName}"/>
+                    <GridViewColumn Header="Tl." Width="40" DisplayMemberBinding="{Binding LineweightMm}"/>
                 </GridView>
             </ListView.View>
         </ListView>

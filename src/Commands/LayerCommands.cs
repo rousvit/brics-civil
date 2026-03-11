@@ -10,65 +10,84 @@ using BricsLayerPlugin.UI;
 namespace BricsLayerPlugin.Commands
 {
     /// <summary>
-    /// BricsCAD příkazy pro správu vrstev ve stylu Vectorworks.
+    /// BricsCAD příkazy pro správu hladin (Levels) ve stylu Vectorworks Design Layers.
+    /// Hladiny = virtuální organizační systém nad entitami.
     /// </summary>
-    public class LayerCommands
+    public class LevelCommands
     {
-        /// <summary>
-        /// Otevře paletu pro správu vrstev.
-        /// </summary>
-        [CommandMethod("VW_LAYERS")]
-        public void OpenLayerPalette()
+        [CommandMethod("VW_LEVELS")]
+        public void OpenLevelPalette()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
-            LayerManager.Instance.LoadFromDocument(doc);
-            LayerPaletteHost.Show();
+            LevelManager.Instance.LoadFromDocument(doc);
+            LayerPaletteHost.ShowLevels();
         }
 
-        /// <summary>
-        /// Vytvoří novou vrstvu.
-        /// </summary>
-        [CommandMethod("VW_LAYER_NEW")]
-        public void CreateLayer()
+        [CommandMethod("VW_LEVEL_NEW")]
+        public void CreateLevel()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
             var ed = doc.Editor;
 
-            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název nové vrstvy: "));
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název nové hladiny: "));
             if (nameResult.Status != PromptStatus.OK) return;
 
             try
             {
-                LayerManager.Instance.CreateLayer(nameResult.StringResult, doc);
-                ed.WriteMessage($"\nVrstva '{nameResult.StringResult}' byla vytvořena.");
-                LayerManager.Instance.SyncDrawOrder(doc);
+                var level = LevelManager.Instance.CreateLevel(nameResult.StringResult);
+                ed.WriteMessage($"\nHladina '{level.Name}' vytvořena.");
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 ed.WriteMessage($"\nChyba: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// Nastaví stav vrstvy (On/Off/Grayed).
-        /// </summary>
-        [CommandMethod("VW_LAYER_STATE")]
-        public void SetLayerState()
+        [CommandMethod("VW_LEVEL_ASSIGN")]
+        public void AssignToLevel()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
             var ed = doc.Editor;
 
-            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název vrstvy: "));
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název hladiny: "));
             if (nameResult.Status != PromptStatus.OK) return;
 
-            var layer = LayerManager.Instance.FindByName(nameResult.StringResult);
-            if (layer == null)
+            var level = LevelManager.Instance.FindByName(nameResult.StringResult);
+            if (level == null)
             {
-                ed.WriteMessage($"\nVrstva '{nameResult.StringResult}' nebyla nalezena.");
+                ed.WriteMessage($"\nHladina '{nameResult.StringResult}' nebyla nalezena.");
+                return;
+            }
+
+            var selResult = ed.GetSelection();
+            if (selResult.Status != PromptStatus.OK) return;
+
+            var ids = new ObjectIdCollection();
+            foreach (SelectedObject selObj in selResult.Value)
+                ids.Add(selObj.ObjectId);
+
+            LevelManager.Instance.AssignEntitiesToLevel(ids, level, doc);
+            ed.WriteMessage($"\nHladina '{level.Name}' přiřazena {ids.Count} objektům.");
+        }
+
+        [CommandMethod("VW_LEVEL_STATE")]
+        public void SetLevelState()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+            var ed = doc.Editor;
+
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název hladiny: "));
+            if (nameResult.Status != PromptStatus.OK) return;
+
+            var level = LevelManager.Instance.FindByName(nameResult.StringResult);
+            if (level == null)
+            {
+                ed.WriteMessage($"\nHladina '{nameResult.StringResult}' nebyla nalezena.");
                 return;
             }
 
@@ -78,97 +97,97 @@ namespace BricsLayerPlugin.Commands
 
             var state = stateResult.StringResult switch
             {
-                "On" => VwLayerState.On,
-                "Off" => VwLayerState.Off,
-                "Grayed" => VwLayerState.Grayed,
-                _ => VwLayerState.On
+                "On" => VwLevelState.On,
+                "Off" => VwLevelState.Off,
+                "Grayed" => VwLevelState.Grayed,
+                _ => VwLevelState.On
             };
 
-            LayerManager.Instance.SetState(layer, state, doc);
-            ed.WriteMessage($"\nVrstva '{layer.Name}' nastavena na {state}.");
+            LevelManager.Instance.SetState(level, state, doc);
+            ed.WriteMessage($"\nHladina '{level.Name}' nastavena na {state}.");
         }
 
-        /// <summary>
-        /// Posune vrstvu nahoru v pořadí.
-        /// </summary>
-        [CommandMethod("VW_LAYER_UP")]
-        public void MoveLayerUp()
+        [CommandMethod("VW_LEVEL_UP")]
+        public void MoveLevelUp()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
             var ed = doc.Editor;
 
-            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název vrstvy k posunutí nahoru: "));
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název hladiny k posunutí nahoru: "));
             if (nameResult.Status != PromptStatus.OK) return;
 
-            var layer = LayerManager.Instance.FindByName(nameResult.StringResult);
-            if (layer == null)
+            var level = LevelManager.Instance.FindByName(nameResult.StringResult);
+            if (level == null)
             {
-                ed.WriteMessage($"\nVrstva '{nameResult.StringResult}' nebyla nalezena.");
+                ed.WriteMessage($"\nHladina '{nameResult.StringResult}' nebyla nalezena.");
                 return;
             }
 
-            LayerManager.Instance.MoveUp(layer);
-            LayerManager.Instance.SyncDrawOrder(doc);
-            ed.WriteMessage($"\nVrstva '{layer.Name}' posunuta nahoru (pořadí: {layer.Order}).");
+            LevelManager.Instance.MoveUp(level);
+            LevelManager.Instance.SyncDrawOrder(doc);
+            ed.WriteMessage($"\nHladina '{level.Name}' posunuta nahoru (pořadí: {level.Order}).");
         }
 
-        /// <summary>
-        /// Posune vrstvu dolů v pořadí.
-        /// </summary>
-        [CommandMethod("VW_LAYER_DOWN")]
-        public void MoveLayerDown()
+        [CommandMethod("VW_LEVEL_DOWN")]
+        public void MoveLevelDown()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
             var ed = doc.Editor;
 
-            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název vrstvy k posunutí dolů: "));
+            var nameResult = ed.GetString(new PromptStringOptions("\nZadejte název hladiny k posunutí dolů: "));
             if (nameResult.Status != PromptStatus.OK) return;
 
-            var layer = LayerManager.Instance.FindByName(nameResult.StringResult);
-            if (layer == null)
+            var level = LevelManager.Instance.FindByName(nameResult.StringResult);
+            if (level == null)
             {
-                ed.WriteMessage($"\nVrstva '{nameResult.StringResult}' nebyla nalezena.");
+                ed.WriteMessage($"\nHladina '{nameResult.StringResult}' nebyla nalezena.");
                 return;
             }
 
-            LayerManager.Instance.MoveDown(layer);
-            LayerManager.Instance.SyncDrawOrder(doc);
-            ed.WriteMessage($"\nVrstva '{layer.Name}' posunuta dolů (pořadí: {layer.Order}).");
+            LevelManager.Instance.MoveDown(level);
+            LevelManager.Instance.SyncDrawOrder(doc);
+            ed.WriteMessage($"\nHladina '{level.Name}' posunuta dolů (pořadí: {level.Order}).");
         }
 
-        /// <summary>
-        /// Synchronizuje draw-order všech vrstev.
-        /// </summary>
-        [CommandMethod("VW_LAYER_SYNC")]
-        public void SyncLayers()
+        [CommandMethod("VW_LEVEL_SYNC")]
+        public void SyncLevels()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
-            LayerManager.Instance.SyncDrawOrder(doc);
-            doc.Editor.WriteMessage("\nPořadí vrstev synchronizováno.");
+            LevelManager.Instance.SyncDrawOrder(doc);
+            doc.Editor.WriteMessage("\nPořadí hladin synchronizováno.");
         }
 
-        /// <summary>
-        /// Vypíše seznam vrstev s jejich stavem a pořadím.
-        /// </summary>
-        [CommandMethod("VW_LAYER_LIST")]
-        public void ListLayers()
+        [CommandMethod("VW_LEVEL_LIST")]
+        public void ListLevels()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
             var ed = doc.Editor;
 
-            LayerManager.Instance.LoadFromDocument(doc);
+            LevelManager.Instance.LoadFromDocument(doc);
 
-            ed.WriteMessage("\n--- Vrstvy (Vectorworks styl) ---");
-            foreach (var layer in LayerManager.Instance.Layers)
+            ed.WriteMessage("\n--- Hladiny (Vectorworks Design Layers) ---");
+            foreach (var level in LevelManager.Instance.Levels)
             {
-                ed.WriteMessage($"\n  {layer}");
+                var active = level.IsActive ? " [AKTIVNÍ]" : "";
+                ed.WriteMessage($"\n  {level}{active}");
             }
-            ed.WriteMessage($"\n--- Celkem: {LayerManager.Instance.Layers.Count} ---");
+            ed.WriteMessage($"\n--- Celkem: {LevelManager.Instance.Levels.Count} ---");
+        }
+
+        [CommandMethod("VW_PANEL")]
+        public void TogglePanel()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+
+            ClassManager.Instance.LoadFromDocument(doc);
+            LevelManager.Instance.LoadFromDocument(doc);
+            LayerPaletteHost.Toggle();
         }
     }
 }

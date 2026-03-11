@@ -7,20 +7,17 @@ using BricsLayerPlugin.Models;
 namespace BricsLayerPlugin.Utils
 {
     /// <summary>
-    /// Ukládání a načítání konfigurace vrstev/tříd do JSON souboru
-    /// vedle DWG souboru (*.vwlayers.json).
+    /// Ukládání a načítání konfigurace tříd a hladin do JSON souboru
+    /// vedle DWG souboru (*.vwconfig.json).
     /// </summary>
     public static class LayerSerializer
     {
-        private record LayerConfig(List<VwLayer> Layers, List<VwClass> Classes);
+        private record VwConfig(List<VwClass> Classes, List<VwLevel> Levels);
 
-        /// <summary>
-        /// Uloží konfiguraci vrstev a tříd vedle DWG souboru.
-        /// </summary>
-        public static void Save(string dwgPath, IReadOnlyList<VwLayer> layers, IReadOnlyList<VwClass> classes)
+        public static void Save(string dwgPath, IReadOnlyList<VwClass> classes, IReadOnlyList<VwLevel> levels)
         {
             var configPath = GetConfigPath(dwgPath);
-            var config = new LayerConfig(new List<VwLayer>(layers), new List<VwClass>(classes));
+            var config = new VwConfig(new List<VwClass>(classes), new List<VwLevel>(levels));
             var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
             {
                 WriteIndented = true,
@@ -29,25 +26,22 @@ namespace BricsLayerPlugin.Utils
             File.WriteAllText(configPath, json);
         }
 
-        /// <summary>
-        /// Načte konfiguraci ze souboru.
-        /// </summary>
-        public static (List<VwLayer> Layers, List<VwClass> Classes)? Load(string dwgPath)
+        public static (List<VwClass> Classes, List<VwLevel> Levels)? Load(string dwgPath)
         {
             var configPath = GetConfigPath(dwgPath);
             if (!File.Exists(configPath)) return null;
 
             var json = File.ReadAllText(configPath);
-            var config = JsonSerializer.Deserialize<LayerConfig>(json, new JsonSerializerOptions
+            var config = JsonSerializer.Deserialize<VwConfig>(json, new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             });
 
             if (config == null) return null;
-            return (config.Layers, config.Classes);
+            return (config.Classes, config.Levels);
         }
 
         private static string GetConfigPath(string dwgPath) =>
-            Path.ChangeExtension(dwgPath, ".vwlayers.json");
+            Path.ChangeExtension(dwgPath, ".vwconfig.json");
     }
 }

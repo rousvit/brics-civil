@@ -1,0 +1,92 @@
+<UserControl x:Class="BricsLayerPlugin.UI.LevelPaletteControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#2D2D30" Foreground="White" MinWidth="280">
+
+    <UserControl.Resources>
+        <Style x:Key="DarkButton" TargetType="Button">
+            <Setter Property="Background" Value="#3E3E42"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#555"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style x:Key="HeaderText" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Foreground" Value="#CCC"/>
+        </Style>
+        <Style x:Key="LabelText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#AAA"/>
+            <Setter Property="Margin" Value="5,3"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style x:Key="ActiveIndicator" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#4EC9B0"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="5,2"/>
+        </Style>
+    </UserControl.Resources>
+
+    <DockPanel>
+        <!-- Header s aktivní hladinou -->
+        <StackPanel DockPanel.Dock="Top" Margin="5">
+            <TextBlock Text="Hladiny (Levels)" Style="{StaticResource HeaderText}"/>
+            <StackPanel Orientation="Horizontal" Margin="5,0">
+                <TextBlock Text="Aktivní:" Style="{StaticResource LabelText}"/>
+                <TextBlock x:Name="ActiveLevelText" Text="(žádná)" Style="{StaticResource ActiveIndicator}"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Toolbar -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="5,0">
+            <Button Content="▲" Style="{StaticResource DarkButton}" Click="MoveUp_Click"
+                    ToolTip="Posunout nahoru (vyšší = nahoře)" Width="32"/>
+            <Button Content="▼" Style="{StaticResource DarkButton}" Click="MoveDown_Click"
+                    ToolTip="Posunout dolů" Width="32"/>
+            <Button Content="+" Style="{StaticResource DarkButton}" Click="AddLevel_Click"
+                    ToolTip="Nová hladina" Width="32"/>
+            <Button Content="✕" Style="{StaticResource DarkButton}" Click="DeleteLevel_Click"
+                    ToolTip="Smazat hladinu" Width="32"/>
+            <Button Content="✓" Style="{StaticResource DarkButton}" Click="SetActive_Click"
+                    ToolTip="Nastavit jako aktivní" Width="32"/>
+            <Button Content="→" Style="{StaticResource DarkButton}" Click="AssignToLevel_Click"
+                    ToolTip="Přiřadit vybrané objekty" Width="32"/>
+            <Button Content="Sync" Style="{StaticResource DarkButton}" Click="SyncOrder_Click"
+                    ToolTip="Synchronizovat pořadí vykreslování"/>
+            <Button Content="⟳" Style="{StaticResource DarkButton}" Click="Refresh_Click"
+                    ToolTip="Obnovit" Width="32"/>
+        </StackPanel>
+
+        <!-- Level list -->
+        <ListView x:Name="LevelListView"
+                  Background="#1E1E1E" Foreground="White"
+                  BorderBrush="#444" Margin="5"
+                  MouseDoubleClick="LevelListView_DoubleClick">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="#" Width="35" DisplayMemberBinding="{Binding Order}"/>
+                    <GridViewColumn Header="Stav" Width="70">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <ComboBox SelectedItem="{Binding State}"
+                                          Background="#3E3E42" Foreground="White"
+                                          SelectionChanged="StateCombo_SelectionChanged"
+                                          Width="60">
+                                    <ComboBoxItem Content="On"/>
+                                    <ComboBoxItem Content="Off"/>
+                                    <ComboBoxItem Content="Grayed"/>
+                                </ComboBox>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="Název" Width="140" DisplayMemberBinding="{Binding Name}"/>
+                    <GridViewColumn Header="Popis" Width="100" DisplayMemberBinding="{Binding Description}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </DockPanel>
+</UserControl>

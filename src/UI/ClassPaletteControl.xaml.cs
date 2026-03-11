@@ -24,36 +24,58 @@ namespace BricsLayerPlugin.UI
             {
                 ClassListView.ItemsSource = null;
                 ClassListView.ItemsSource = ClassManager.Instance.Classes;
+                UpdateActiveClassDisplay();
             });
+        }
+
+        private void UpdateActiveClassDisplay()
+        {
+            var active = ClassManager.Instance.ActiveClass;
+            ActiveClassText.Text = active != null ? active.Name : "(žádná)";
         }
 
         private void AddClass_Click(object sender, RoutedEventArgs e)
         {
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+
             var nameDialog = new InputDialog("Nová třída", "Zadejte název třídy:");
             if (nameDialog.ShowDialog() != true) return;
 
             try
             {
-                var cls = ClassManager.Instance.CreateClass(nameDialog.InputText);
-
                 // Dialog pro barvu
-                var colorDialog = new InputDialog("Barva", "Index barvy (1-255) [7]:");
+                int colorIndex = 7;
+                var colorDialog = new InputDialog("Barva", "Index barvy ACI (1-255) [7]:");
                 if (colorDialog.ShowDialog() == true && int.TryParse(colorDialog.InputText, out var ci))
-                    cls.ColorIndex = Math.Clamp(ci, 1, 255);
+                    colorIndex = Math.Clamp(ci, 1, 255);
 
                 // Dialog pro typ čáry
-                var ltDialog = new InputDialog("Typ čáry", "Typ čáry [Continuous]:");
+                string linetype = "Continuous";
+                var linetypes = ClassManager.Instance.GetAvailableLinetypes(doc);
+                var ltDialog = new InputDialog("Typ čáry",
+                    $"Typ čáry [{string.Join(", ", linetypes)}]:");
                 if (ltDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(ltDialog.InputText))
-                    cls.LinetypeName = ltDialog.InputText;
+                    linetype = ltDialog.InputText;
 
                 // Dialog pro tloušťku
-                var lwDialog = new InputDialog("Tloušťka", "Tloušťka čáry v mm [0.25]:");
-                if (lwDialog.ShowDialog() == true && double.TryParse(lwDialog.InputText, out var lw))
-                    cls.LineweightMm = lw;
+                double lineweight = 0.25;
+                var lwDialog = new InputDialog("Tloušťka čáry", "Tloušťka čáry v mm [0.25]:");
+                if (lwDialog.ShowDialog() == true && double.TryParse(lwDialog.InputText,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var lw))
+                    lineweight = lw;
 
-                RefreshList();
+                // Dialog pro průhlednost
+                int transparency = 0;
+                var trDialog = new InputDialog("Průhlednost", "Průhlednost 0-90% [0]:");
+                if (trDialog.ShowDialog() == true && int.TryParse(trDialog.InputText, out var tr))
+                    transparency = Math.Clamp(tr, 0, 90);
+
+                ClassManager.Instance.CreateClass(nameDialog.InputText, doc,
+                    colorIndex, linetype, lineweight, transparency);
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -63,8 +85,14 @@ namespace BricsLayerPlugin.UI
         {
             if (ClassListView.SelectedItem is not VwClass cls) return;
 
+            if (cls.BricsLayerName == "0")
+            {
+                MessageBox.Show("Vrstvu '0' nelze smazat.", "Chyba", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             var result = MessageBox.Show(
-                $"Opravdu smazat třídu '{cls.Name}'?\nObjekty budou nastaveny na ByLayer.",
+                $"Opravdu smazat třídu '{cls.Name}'?\nObjekty budou přesunuty na vrstvu '0'.",
                 "Potvrdit smazání", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
             if (result != MessageBoxResult.Yes) return;
@@ -72,48 +100,89 @@ namespace BricsLayerPlugin.UI
             var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
 
-            ClassManager.Instance.DeleteClass(cls, doc);
+            try
+            {
+                ClassManager.Instance.DeleteClass(cls, doc);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Chyba", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void EditClass_Click(object sender, RoutedEventArgs e)
         {
             if (ClassListView.SelectedItem is not VwClass cls) return;
 
-            var colorDialog = new InputDialog("Barva", $"Nový index barvy [{cls.ColorIndex}]:");
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+
+            // Barva
+            var colorDialog = new InputDialog("Barva", $"Index barvy ACI [{cls.ColorIndex}]:");
             if (colorDialog.ShowDialog() == true && int.TryParse(colorDialog.InputText, out var ci))
                 cls.ColorIndex = Math.Clamp(ci, 1, 255);
 
-            var ltDialog = new InputDialog("Typ čáry", $"Nový typ čáry [{cls.LinetypeName}]:");
+            // Typ čáry
+            var linetypes = ClassManager.Instance.GetAvailableLinetypes(doc);
+            var ltDialog = new InputDialog("Typ čáry",
+                $"Typ čáry [{cls.LinetypeName}]\nDostupné: {string.Join(", ", linetypes)}");
             if (ltDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(ltDialog.InputText))
                 cls.LinetypeName = ltDialog.InputText;
 
-            var lwDialog = new InputDialog("Tloušťka", $"Nová tloušťka [{cls.LineweightMm}]:");
-            if (lwDialog.ShowDialog() == true && double.TryParse(lwDialog.InputText, out var lw))
+            // Tloušťka
+            var lwDialog = new InputDialog("Tloušťka", $"Tloušťka v mm [{cls.LineweightMm}]:");
+            if (lwDialog.ShowDialog() == true && double.TryParse(lwDialog.InputText,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var lw))
                 cls.LineweightMm = lw;
 
-            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
-            if (doc != null)
-                ClassManager.Instance.UpdateClass(cls, doc);
+            // Průhlednost
+            var trDialog = new InputDialog("Průhlednost", $"Průhlednost 0-90% [{cls.Transparency}]:");
+            if (trDialog.ShowDialog() == true && int.TryParse(trDialog.InputText, out var tr))
+                cls.Transparency = Math.Clamp(tr, 0, 90);
+
+            ClassManager.Instance.UpdateClassProperties(cls, doc);
         }
 
-        private void AssignClass_Click(object sender, RoutedEventArgs e)
+        private void SetActive_Click(object sender, RoutedEventArgs e)
         {
             if (ClassListView.SelectedItem is not VwClass cls) return;
 
             var doc = BcadApplication.DocumentManager.MdiActiveDocument;
             if (doc == null) return;
-            var ed = doc.Editor;
 
-            ed.WriteMessage($"\nVyberte objekty pro přiřazení třídy '{cls.Name}'...");
+            ClassManager.Instance.SetActive(cls, doc);
+        }
 
-            // Spustit výběr přes příkaz – uživatel musí spustit VW_CLASS_ASSIGN z příkazové řádky
-            // pro plnou interaktivitu, protože SelectionSet z palety vyžaduje CommandFlags.UsePickSet
-            MessageBox.Show(
-                $"Pro přiřazení třídy '{cls.Name}' objektům:\n\n" +
-                $"1. Vyberte objekty v kreslicí ploše\n" +
-                $"2. Zadejte příkaz: VW_CLASS_ASSIGN\n" +
-                $"3. Zadejte název třídy: {cls.Name}",
-                "Přiřazení třídy", MessageBoxButton.OK, MessageBoxImage.Information);
+        private void ClassListView_DoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            // Dvojklik = nastavit jako aktivní třídu
+            if (ClassListView.SelectedItem is not VwClass cls) return;
+
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+
+            ClassManager.Instance.SetActive(cls, doc);
+        }
+
+        private void VisibilityCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is not ComboBox combo) return;
+            if (combo.DataContext is not VwClass cls) return;
+
+            var doc = BcadApplication.DocumentManager.MdiActiveDocument;
+            if (doc == null) return;
+
+            var visText = (combo.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            var visibility = visText switch
+            {
+                "On" => VwClassVisibility.On,
+                "Off" => VwClassVisibility.Off,
+                "Grayed" => VwClassVisibility.Grayed,
+                _ => VwClassVisibility.On
+            };
+
+            ClassManager.Instance.SetVisibility(cls, visibility, doc);
         }
 
         private void Refresh_Click(object sender, RoutedEventArgs e)
@@ -128,12 +197,11 @@ namespace BricsLayerPlugin.UI
             if (ClassListView.SelectedItem is VwClass cls)
             {
                 DetailPanel.Visibility = Visibility.Visible;
-                DetailName.Text = cls.Name;
+                DetailName.Text = cls.IsActive ? $"{cls.Name} (aktivní)" : cls.Name;
                 DetailColorText.Text = $"ACI {cls.ColorIndex}";
                 DetailLinetype.Text = cls.LinetypeName;
                 DetailLineweight.Text = $"{cls.LineweightMm} mm";
-
-                // Přibližná barva pro ACI index
+                DetailTransparency.Text = $"{cls.Transparency}%";
                 DetailColorSwatch.Fill = new SolidColorBrush(AciToApproxColor(cls.ColorIndex));
             }
             else
